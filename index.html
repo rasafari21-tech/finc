@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>finc</title>
+<meta name="description" content="Auditoría financiera personal offline. Cuatro techos, reglas inflexibles, cierre automático el día 1.">
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#f2f3f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1118" media="(prefers-color-scheme: dark)">
+
+<!-- iOS: sin esto, "Añadir a pantalla de inicio" abre una pestaña de Safari
+     en lugar de una app, y se pierden Service Worker y notificaciones. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="finc">
+<!-- iOS usa este para la pantalla de inicio y le aplica su propia máscara
+     redondeada, así que la imagen va a sangre, sin esquinas ni transparencia. -->
+<link rel="apple-touch-icon" href="./iconos/icono-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./iconos/icono-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./iconos/icono-512.png">
+
+<link rel="stylesheet" href="./estilos/app.css?v=3">
+</head>
+<body>
+
+<div id="app"><div class="vacio" style="margin:auto">Abriendo el almacén…</div></div>
+<div id="hojas"></div>
+<div id="brindis"></div>
+
+<noscript>
+  <div style="padding:24px;font-family:system-ui">
+    <h1>Hace falta JavaScript</h1>
+    <p>Esta aplicación calcula todo en tu dispositivo y no tiene servidor que pueda hacerlo por ti.</p>
+  </div>
+</noscript>
+
+<script type="module" src="./src/app/main.js?v=3"></script>
+</body>
+</html>

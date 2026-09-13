@@ -1,0 +1,15 @@
+# El binario de Claude Code vive en esta carpeta por casualidad. Pesa 250 MB y
+# GitHub rechaza cualquier archivo de mas de 100 MB, asi que fuera.
+claude.exe
+
+# Dependencias (la app no usa ninguna; esto es por si algun dia hay tooling)
+node_modules/
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Temporales
+*.log
+*.tmp

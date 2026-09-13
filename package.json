@@ -1,0 +1,12 @@
+{
+  "name": "finc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PWA offline-first de auditoria financiera personal. Sin dependencias: Node solo se usa para ejecutar los tests del motor financiero.",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "servir": "python -m http.server 8000",
+    "empaquetar": "python tools/empaquetar.py"
+  }
+}

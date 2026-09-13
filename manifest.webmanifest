@@ -1,0 +1,20 @@
+{
+  "name": "finc",
+  "short_name": "finc",
+  "description": "Auditoría financiera personal offline. Cuatro techos, reglas inflexibles, cierre automático el día 1.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f3f6",
+  "theme_color": "#f2f3f6",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "./iconos/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./iconos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./iconos/icono-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" },
+    { "src": "./iconos/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

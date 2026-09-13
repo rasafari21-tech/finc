@@ -1,0 +1,411 @@
+/* finc — hoja de estilo unica.
+   Movil primero. Todo control interactivo vive por debajo del 55 % de la
+   altura de pantalla: la cabecera y las barras se leen, no se tocan. */
+
+:root {
+  --paper: #f2f3f6;
+  --sup: #ffffff;
+  --sup-2: #e9ebf1;
+  --sup-3: #dfe2eb;
+  --tinta: #161a26;
+  --tinta-2: #4a5164;
+  --tinta-3: #767d92;
+  --linea: #d2d7e2;
+  --acento: #2e3f86;
+  --acento-suave: #dee3f6;
+  --ok: #1b6b45;
+  --ok-suave: #dbede3;
+  --mal: #a63228;
+  --mal-suave: #f7dfdb;
+  --avisa: #7f5c12;
+  --avisa-suave: #f4ead1;
+  --radio: 10px;
+  --seguro-inf: env(safe-area-inset-bottom, 0px);
+  --seguro-sup: env(safe-area-inset-top, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    --paper: #0f1118;
+    --sup: #171a24;
+    --sup-2: #1e2230;
+    --sup-3: #262b3b;
+    --tinta: #e7eaf3;
+    --tinta-2: #a8afc3;
+    --tinta-3: #79819a;
+    --linea: #2b3142;
+    --acento: #94a6f2;
+    --acento-suave: #212949;
+    --ok: #54c08c;
+    --ok-suave: #13301f;
+    --mal: #f0867a;
+    --mal-suave: #3a1d19;
+    --avisa: #dcb25c;
+    --avisa-suave: #33290f;
+  }
+}
+
+:root[data-tema='oscuro'] {
+  --paper: #0f1118;
+  --sup: #171a24;
+  --sup-2: #1e2230;
+  --sup-3: #262b3b;
+  --tinta: #e7eaf3;
+  --tinta-2: #a8afc3;
+  --tinta-3: #79819a;
+  --linea: #2b3142;
+  --acento: #94a6f2;
+  --acento-suave: #212949;
+  --ok: #54c08c;
+  --ok-suave: #13301f;
+  --mal: #f0867a;
+  --mal-suave: #3a1d19;
+  --avisa: #dcb25c;
+  --avisa-suave: #33290f;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--paper);
+  color: var(--tinta);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+.num { font-variant-numeric: tabular-nums; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+/* ---------- estructura ---------- */
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 560px;
+  margin: 0 auto;
+  padding-top: var(--seguro-sup);
+}
+
+.cabecera {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px 6px;
+}
+.cabecera .periodo { font-weight: 600; font-size: 15px; }
+.cabecera .sub { font-size: 12px; color: var(--tinta-3); }
+.cabecera .iconos { display: flex; gap: 4px; }
+.icono {
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border-radius: 9px; font-size: 17px; color: var(--tinta-2);
+}
+.icono:active { background: var(--sup-2); }
+.icono.alerta { color: var(--mal); }
+
+/* La zona de captura NUNCA se encoge: es la que tiene que caer siempre bajo el
+   pulgar. Cuando la pantalla es corta, lo que cede es la zona de lectura, que
+   pasa a desplazarse. Al reves —que fue el primer intento— el teclado se
+   comprime por debajo de su contenido y las barras se solapan con las fichas. */
+.zona-lectura {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px 4px;
+}
+.zona-captura {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px calc(10px + var(--seguro-inf));
+}
+
+/* ---------- avisos ---------- */
+
+.aviso {
+  margin: 0 16px 10px;
+  padding: 10px 13px;
+  border-radius: var(--radio);
+  font-size: 13.5px;
+  line-height: 1.4;
+  background: var(--sup);
+  border: 1px solid var(--linea);
+  border-left: 3px solid var(--tinta-3);
+}
+.aviso strong { display: block; margin-bottom: 2px; }
+.aviso.rojo { background: var(--mal-suave); border-left-color: var(--mal); }
+.aviso.ambar { background: var(--avisa-suave); border-left-color: var(--avisa); }
+.aviso.verde { background: var(--ok-suave); border-left-color: var(--ok); }
+.aviso .acciones { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.aviso button {
+  padding: 6px 12px; border-radius: 7px; font-size: 13px; font-weight: 600;
+  background: var(--sup-3);
+}
+.aviso button.principal { background: var(--acento); color: var(--sup); }
+@media (prefers-color-scheme: dark) { .aviso button.principal { color: var(--paper); } }
+
+/* ---------- barras de techo ---------- */
+
+.techos { display: grid; gap: 7px; margin-bottom: 10px; }
+
+.techo {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 10px;
+  align-items: baseline;
+  padding: 2px 0;
+  border-radius: 8px;
+}
+.techo:active { background: var(--sup-2); }
+.techo .nombre { font-size: 13.5px; font-weight: 600; }
+.techo .cifra { font-size: 12.5px; color: var(--tinta-2); text-align: right; }
+.techo .cifra b { color: var(--tinta); }
+.techo .cifra.rebasado b { color: var(--mal); }
+
+.pista {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 14px;
+  background: var(--sup-3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.relleno {
+  position: absolute; inset: 0 auto 0 0;
+  background: var(--ok);
+  border-radius: 4px 0 0 4px;
+  transition: width 180ms ease-out;
+}
+/* El sobrepaso no se distingue solo por color: lleva trama diagonal, para que
+   la lectura sobreviva a un daltonismo rojo-verde. */
+.relleno.rebasado {
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.3) 0 3px, rgba(255,255,255,0) 3px 7px),
+    var(--mal);
+}
+.marca-ritmo {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--tinta); opacity: .45;
+}
+
+.tarjeta-fondo {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 9px 13px; margin-bottom: 10px;
+  background: var(--acento-suave);
+  border-radius: var(--radio);
+}
+.tarjeta-fondo .et { font-size: 12px; color: var(--acento); font-weight: 600; }
+.tarjeta-fondo .val { font-size: 19px; font-weight: 700; color: var(--acento); }
+
+@media (prefers-reduced-motion: reduce) { .relleno { transition: none; } }
+
+/* ---------- captura ---------- */
+
+.conmutador {
+  display: flex; gap: 4px; padding: 3px;
+  background: var(--sup-2); border-radius: 9px; margin-bottom: 7px;
+}
+.conmutador button {
+  flex: 1; padding: 6px; border-radius: 7px; font-size: 13.5px; font-weight: 600;
+  color: var(--tinta-3);
+}
+.conmutador button[aria-pressed='true'] { background: var(--sup); color: var(--tinta); }
+
+.visor {
+  text-align: right;
+  padding: 2px 8px 8px;
+  min-height: 52px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.visor .importe {
+  font-size: 38px; font-weight: 700; letter-spacing: -.02em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.visor .importe.vacio { color: var(--tinta-3); }
+.visor .pista-txt { font-size: 12px; color: var(--tinta-3); margin-top: 5px; min-height: 16px; }
+
+.fichas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 7px; }
+.ficha {
+  padding: 7px 4px; border-radius: 9px; background: var(--sup-2);
+  font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.25;
+  border: 2px solid transparent;
+}
+.ficha[aria-pressed='true'] { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); }
+.ficha .restante { display: block; font-size: 10px; font-weight: 500; color: var(--tinta-3); margin-top: 2px; }
+.ficha[aria-pressed='true'] .restante { color: var(--acento); }
+
+.previo-reparto { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 7px; }
+.previo-reparto div {
+  padding: 8px 4px; border-radius: 9px; background: var(--sup-2); text-align: center;
+}
+.previo-reparto .p { font-size: 10.5px; color: var(--tinta-3); }
+.previo-reparto .v { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tecla {
+  height: 46px; border-radius: 10px; background: var(--sup);
+  font-size: 22px; font-weight: 500; display: grid; place-items: center;
+  border: 1px solid var(--linea);
+}
+.tecla:active { background: var(--sup-3); }
+.tecla.accion { font-size: 18px; color: var(--tinta-2); }
+
+.confirmar {
+  margin-top: 7px; height: 50px; width: 100%; border-radius: 11px;
+  background: var(--acento); color: var(--sup);
+  font-size: 16.5px; font-weight: 700;
+  display: grid; place-items: center;
+  transition: opacity 120ms;
+}
+@media (prefers-color-scheme: dark) { .confirmar { color: var(--paper); } }
+.confirmar[disabled] { opacity: .35; }
+.confirmar:active:not([disabled]) { opacity: .85; }
+
+/* ---------- hojas ---------- */
+
+.velo {
+  position: fixed; inset: 0; background: rgba(10, 12, 18, .45);
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 40; animation: aparecer 150ms ease-out;
+}
+@keyframes aparecer { from { opacity: 0 } to { opacity: 1 } }
+
+.hoja {
+  width: 100%; max-width: 560px; max-height: 88dvh; overflow-y: auto;
+  background: var(--paper);
+  border-radius: 18px 18px 0 0;
+  padding: 8px 18px calc(20px + var(--seguro-inf));
+  animation: subir 200ms cubic-bezier(.2,.8,.3,1);
+}
+@keyframes subir { from { transform: translateY(14px) } to { transform: translateY(0) } }
+@media (prefers-reduced-motion: reduce) {
+  .velo, .hoja { animation: none; }
+}
+
+.hoja .asa { width: 36px; height: 4px; border-radius: 2px; background: var(--linea); margin: 0 auto 14px; }
+.hoja h2 { font-size: 20px; margin: 0 0 8px; line-height: 1.2; letter-spacing: -.01em; }
+.hoja h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--tinta-3); margin: 20px 0 8px; }
+.hoja p { margin: 0 0 12px; font-size: 14.5px; color: var(--tinta-2); line-height: 1.5; }
+.hoja p.destacado { color: var(--tinta); }
+
+.botones { display: grid; gap: 8px; margin-top: 16px; }
+.btn {
+  padding: 14px; border-radius: 11px; font-size: 15.5px; font-weight: 600;
+  text-align: center; background: var(--sup-2);
+}
+.btn.principal { background: var(--acento); color: var(--sup); }
+@media (prefers-color-scheme: dark) { .btn.principal { color: var(--paper); } }
+.btn.peligro { background: var(--mal-suave); color: var(--mal); }
+/* Dentro del boton destacado el texto secundario hereda el color del boton:
+   var(--tinta-2) sobre el acento queda azul sobre azul e ilegible. */
+.btn.principal small, .btn.principal b { color: inherit; }
+.btn.principal small { opacity: .82; }
+.btn small { color: var(--tinta-2); }
+.btn small.nota-aviso { color: var(--avisa); }
+.btn.principal small.nota-aviso { color: inherit; }
+.btn[disabled] { opacity: .4; }
+
+.sugerencia {
+  display: flex; align-items: center; gap: 9px;
+  padding: 12px 14px; border-radius: 11px;
+  background: var(--ok-suave); color: var(--ok);
+  font-size: 14px; font-weight: 600; margin-bottom: 4px;
+}
+.sugerencia .resto { margin-left: auto; font-weight: 500; opacity: .85; font-size: 13px; }
+
+.lista { display: grid; gap: 1px; background: var(--linea); border-radius: var(--radio); overflow: hidden; }
+.fila {
+  display: grid; grid-template-columns: 1fr auto; gap: 3px 12px;
+  padding: 11px 13px; background: var(--paper); align-items: baseline;
+}
+.fila .t { font-size: 14.5px; }
+.fila .s { grid-column: 1; font-size: 12px; color: var(--tinta-3); }
+.fila .v { font-size: 14.5px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.fila .v.neg { color: var(--mal); }
+.fila .v.pos { color: var(--ok); }
+
+.campo { margin-bottom: 14px; }
+.campo label { display: block; font-size: 12.5px; color: var(--tinta-3); margin-bottom: 5px; }
+.campo input, .campo select, .campo textarea {
+  width: 100%; padding: 12px 13px; border-radius: 10px;
+  border: 1px solid var(--linea); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 16px; /* 16px evita el zoom automatico de iOS */
+  user-select: text;
+}
+.campo textarea { min-height: 78px; resize: vertical; }
+.campo .ayuda { font-size: 11.5px; color: var(--tinta-3); margin-top: 4px; }
+.campo.error input, .campo.error textarea { border-color: var(--mal); }
+
+.etiquetas { display: flex; flex-wrap: wrap; gap: 6px; }
+.etiquetas button {
+  padding: 7px 12px; border-radius: 20px; background: var(--sup-2);
+  font-size: 13px; font-weight: 500;
+}
+.etiquetas button[aria-pressed='true'] { background: var(--acento); color: var(--sup); }
+@media (prefers-color-scheme: dark) { .etiquetas button[aria-pressed='true'] { color: var(--paper); } }
+
+.interruptor { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; }
+.interruptor .txt { font-size: 14.5px; }
+.interruptor .txt small { display: block; color: var(--tinta-3); font-size: 12px; }
+.palanca { width: 48px; height: 28px; border-radius: 14px; background: var(--sup-3); position: relative; flex: none; }
+.palanca::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--sup); transition: transform 140ms;
+}
+.palanca[aria-pressed='true'] { background: var(--acento); }
+.palanca[aria-pressed='true']::after { transform: translateX(20px); }
+
+/* ---------- brindis de deshacer ---------- */
+
+.brindis {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(14px + var(--seguro-inf));
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 16px; border-radius: 12px;
+  background: var(--tinta); color: var(--paper);
+  font-size: 14px; z-index: 50; max-width: calc(100% - 28px);
+  box-shadow: 0 8px 28px -10px rgba(0,0,0,.5);
+}
+.brindis button { font-weight: 700; color: var(--paper); text-decoration: underline; white-space: nowrap; }
+
+/* ---------- banda de estado ---------- */
+
+.banda {
+  flex: none; padding: 7px 16px; font-size: 12px; text-align: center;
+  background: var(--avisa-suave); color: var(--avisa); font-weight: 600;
+}
+.banda.rojo { background: var(--mal-suave); color: var(--mal); }
+.banda button { text-decoration: underline; font-weight: 700; margin-left: 6px; }
+
+.vacio { text-align: center; color: var(--tinta-3); font-size: 14px; padding: 26px 12px; }
+
+/* ---------- bloqueo ---------- */
+
+.bloqueo {
+  position: fixed; inset: 0; z-index: 60;
+  background: var(--paper);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 28px;
+}
+.bloqueo h1 { font-size: 22px; margin: 0; }
+.bloqueo p { color: var(--tinta-2); font-size: 14.5px; text-align: center; margin: 0; max-width: 34ch; }
+.puntos { display: flex; gap: 12px; }
+.punto { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--tinta-3); }
+.punto.lleno { background: var(--acento); border-color: var(--acento); }
+.bloqueo .teclado { width: 100%; max-width: 280px; }

@@ -1,0 +1,103 @@
+Eres un **arquitecto de aplicaciones PWA senior especializado en finanzas personales**, con experiencia profunda en desarrollo iOS nativo, sincronización de datos offline-first, y diseño de motores de validación financiera rigurosos.
+
+Tu tarea es diseñar la especificación técnica completa y el plan de implementación para un **Auditor Financiero Personal Offline-First** — una PWA nativa para iOS que combine persistencia robusta, procesamiento de visión por computadora y cumplimiento estricto de reglas de asignación presupuestaria.
+
+**Objetivo Principal:**
+Crear un documento de especificación ejecutable que defina arquitectura, componentes críticos, flujos de datos, reglas de validación, y roadmap técnico para una aplicación que sea operativa sin conexión, segura mediante biometría, y capaz de auditar automáticamente la salud financiera del usuario.
+
+---
+
+**REQUISITOS DE ARQUITECTURA Y PERSISTENCIA**
+
+1. **Stack PWA Avanzado:**
+   - Framework reactivo ligero (Svelte o React) con Service Workers de última generación, seleccionado según mejor adaptación al proyecto
+   - Carga instantánea y operatividad 100% offline en iPhone
+   - Especifica estrategia de caché, actualización de assets, y sincronización de Service Workers
+
+2. **Persistencia Híbrida:**
+   - Almacenamiento local mediante IndexedDB en el iPhone para rapidez absoluta
+      - Define el esquema de datos IndexedDB, estructura de conflictos de sincronización para guradar en local 
+
+---
+
+**MOTOR FINANCIERO Y LÓGICA DE NEGOCIO**
+
+4. **Algoritmo de Asignación Dual:**
+   - **Base Fija:** Asignación estructural automática al inicio del período — define parámetros configurables, validaciones de entrada, y almacenamiento de estado
+   - **Flujo Variable (Citas/Atenciones):** Motor de ingreso dinámico que calcula e integra instantáneamente el desglose:
+     * 50% Esenciales
+     * 25% Inversión
+     * 15% Reserva
+     * 10% Recompensas
+   - Explica cómo el desglose se aplica contra los techos disponibles, cómo se manejan ingresos parciales, y qué ocurre cuando un ingreso causa sobrepasos
+
+5. **Motor de Clasificación Inflexible:**
+   - Sistema de reglas rígidas de validación que impide autoengaño en etiquetas de gasto
+   - Ejemplo: bloquea regalos o ropa de eventos en *Esenciales* o *Inversión*; los fuerza a *Recompensas*
+   - Especifica el conjunto completo de reglas de categorización, cómo se comunican rechazos al usuario, y mecanismo para sugerir categoría correcta
+
+6. **Cierre de Ciclo Automático y Carry-Forward:**
+   - Ejecución automática el día 1 de cada mes a las 00:00:
+     * Archiva historial del mes anterior
+     * Reinicia a cero los acumulados de las 4 categorías
+     * Transfiere automáticamente el remanente no utilizado de *Reserva* al **Fondo de Ahorro Acumulado (Carry-Forward)**
+     * Mantiene el Fondo intacto e independiente de los cierres mensuales
+   - Define estructura de datos para historial archivado, mecanismo de carry-forward, y recuperabilidad de datos históricos
+
+7. **Diagnóstico de Subfinanciamiento Estructural:**
+   - Algoritmo que analiza si el techo del 50% en *Esenciales* es rebasado con frecuencia
+   - Emite alertas directas cuando la regla porcentual requiere revisión de fondo
+   - Especifica ventana de análisis, umbral de frecuencia, contenido de alerta, y canal de entrega
+
+---
+
+**MÓDULO DE AUDITORÍA VISIÓN /
+
+Registro manual de cada cartegorai 
+---
+
+**EXPERIENCIA DE USUARIO (UI/UX MÓVIL)**
+
+10. **Registro Ultra-Rápido:**
+    - Interfaz simplificada tipo *Quick-Action* optimizada para ingresar gastos o ingresos en menos de 3 segundos desde la pantalla principal
+    - Describe flujo de entrada, campos requeridos, gestos, y atajos para categorización rápida
+
+11. **Dashboard Visual Interactivo:**
+    - Paneles de progreso que muestran el consumo de techos en tiempo real mediante barras de estado de alto contraste
+    - Verde para margen disponible, rojo para sobrepasos
+    - Especifica componentes visuales, actualización en tiempo real, e información adicional al hacer tap
+
+12. **Notificaciones Push Locales:**
+    - Alertas nativas en iOS los días 1 de cada mes para solicitar la carga del extracto bancario de anclaje de saldo
+    - Notificaciones para revisar el informe del cierre mensual
+    - Define cronograma de notificaciones, contenido, acciones derivadas, y configuración por usuario
+
+---
+
+**ENTREGABLES ESPERADOS**
+
+Produce un documento de especificación técnica que incluya:
+
+- **Arquitectura General:** Diagrama de componentes, flujos de datos, y puntos de integración
+- **Esquema de Base de Datos:** Estructura IndexedDB, tablas, relaciones, y política de versionado
+- 
+- **Reglas de Negocio:** Especificación formal del Motor de Clasificación, Asignación Dual, y Diagnóstico
+- **Interfaz de Usuario:** Wireframes o descripciones detalladas de pantallas clave, flujos de usuario
+- **Roadmap Técnico:** Fases de implementación, dependencias críticas, y estimación de complejidad
+-- **Casos de Uso y Ejemplos:** Escenarios reales (ingreso irregular, cierre mensual, OCR de extracto, alerta de subfinanciamiento)
+
+---
+
+**ALCANCE Y ENFOQUE DE IMPLEMENTACIÓN**
+
+La especificación debe asumir una implementación sólida basada en buenas prácticas de ingeniería, sin incluir cobertura exhaustiva de tests en la documentación. Elige el stack técnico que mejor se adapte al proyecto en función de los requisitos de rendimiento offline-first, seguridad biométrica, y procesamiento OCR en dispositivo.
+
+---
+
+**RESTRICCIONES Y CONSIDERACIONES**
+
+- La especificación debe ser técnicamente viable y ejecutable por un equipo de desarrollo frontend/backend
+- Prioriza operatividad offline sin sacrificar seguridad
+- El diseño debe escalar a millones de transacciones históricas sin degradación de rendimiento
+- Asume que la aplicación opera en iPhone con acceso a WebAuthn, IndexedDB, Service Workers, y APIs nativas de cámara
+- La especificación debe ser lo suficientemente detallada como para servir de brief ejecutable a ingenieros, pero no exhaustiva — deja espacio para decisiones técnicas en implementación
