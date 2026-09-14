@@ -98,19 +98,35 @@ tras siete días sin uso.
 
 ### El icono
 
-Sale de `iconos/portada.jpg`. La foto es vertical y un icono de móvil es
-cuadrado, así que `tools/iconos.py` recorta la franja de arriba —cono, cabeza y
-hombros—, que es lo único que sigue siendo reconocible cuando el icono mide seis
-milímetros, y añade margen por arriba y por la derecha para que la punta del
-cono no la recorte la máscara redondeada de iOS.
+Sale de `iconos/portada.jpg` y lo genera `tools/iconos.py`.
 
-Para cambiar la foto: sustituye `iconos/portada.jpg` y ejecuta el script. Si el
-encuadre no convence, los tres valores que lo gobiernan están arriba del archivo
-(`MARGEN_ARRIBA`, `MARGEN_DERECHA`, `ALTO_UTIL`).
+La portada es **pixel art**, y eso manda sobre todo lo demás: escalarla con un
+filtro suave la convierte en una mancha borrosa. Todo se escala con vecino más
+cercano, que conserva el borde duro de cada píxel.
+
+Hay un problema previo: la portada llega en JPEG, y el JPEG destroza justo lo
+que define al pixel art —los bordes salen con halo y aparecen decenas de
+blancos distintos—. Así que el script mide el tamaño real de la celda, encuentra
+el desfase de la rejilla, reconstruye el dibujo lógico tomando el color
+dominante del centro de cada celda y fusiona los colores casi idénticos. De 980
+píxeles emborronados salen 64×64 celdas limpias con doce colores.
+
+El lado del recorte es potencia de dos a propósito: 64 × 3 = 192, × 8 = 512,
+× 16 = 1024. Los tamaños que pide el sistema salen por multiplicación exacta,
+sin interpolar ni un píxel.
+
+Para cambiar la portada: sustituye `iconos/portada.jpg` y ejecuta el script. Si
+la nueva no es pixel art, lo detecta por el número de colores y pasa a recorte
+centrado con filtro suave, que es lo correcto para una fotografía.
 
 Dos archivos sirven para comprobarlo sin tocar el teléfono:
 `iconos/previsualizacion.png` aplica la máscara real de iOS y
 `iconos/pantalla-inicio.png` enseña cómo queda a tamaño de pantalla de inicio.
+`iconos/logica.png` es el dibujo reconstruido, por si quieres editarlo a mano.
+
+**Ojo al cambiarlo:** iOS congela el icono al añadir la app a la pantalla de
+inicio. Si cambias la portada de una app ya instalada, hay que borrarla del
+teléfono y volver a añadirla; no se actualiza sola.
 
 ---
 

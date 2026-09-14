@@ -1,28 +1,39 @@
-"""Genera los iconos de la PWA a partir de la foto de portada.
+"""Genera los iconos de la PWA a partir de la portada.
 
-El problema: la foto es vertical (821x1743) y un icono de movil es cuadrado.
-Recortar sin mas deja fuera lo unico que se reconoce a 60 px, que es el cono.
+La portada es pixel art, y eso manda sobre todo lo demas: si se redimensiona
+con un filtro suave se convierte en una mancha borrosa. Aqui todo se escala
+con vecino mas cercano, que conserva el borde duro de cada pixel.
 
-Lo que hace este script:
+Hay un problema previo: la portada llega en JPEG, y el JPEG destroza
+precisamente lo que define al pixel art. Los bordes salen con halos y aparecen
+docenas de blancos distintos (255, 254, 253...). Asi que el script:
 
-  1. Toma la franja superior —cono, cabeza y hombros—, que es la parte que
-     sigue siendo legible cuando el icono mide seis milimetros.
-  2. Extiende el lienzo por arriba y por la derecha espejando la pared, para
-     que la punta del cono no quede pegada a la esquina. iOS recorta las
-     esquinas con una mascara redondeada y ahi se comeria la punta.
-  3. Saca las medidas que piden iOS y Android, mas una version «maskable»
-     con el cono dentro de la zona segura circular.
-  4. Deja una previsualizacion con la mascara de iOS aplicada, para poder
-     comprobar el encuadre sin instalar nada en el telefono.
+  1. Mide el tamaño real de la celda buscando los bordes fuertes.
+  2. Encuentra el desfase de la rejilla probando cual deja las celdas mas
+     uniformes por dentro.
+  3. Reconstruye el dibujo logico tomando el color dominante del centro de
+     cada celda, lejos del halo del borde.
+  4. Fusiona los colores casi identicos: lo que eran 40 blancos vuelve a ser
+     uno solo.
+  5. Recorta alrededor del dibujo. Sobra mucho fondo, y un icono con la figura
+     diminuta no se lee en la pantalla de inicio.
+
+El lado del recorte se elige potencia de dos para que los tamaños que pide el
+sistema salgan por multiplicacion exacta: 64 x 3 = 192, x 8 = 512, x 16 = 1024.
+
+Si algun dia la portada deja de ser pixel art, el script lo detecta por el
+numero de colores y pasa a recorte centrado con filtro suave, que es lo
+correcto para una fotografia.
 
 Requiere Pillow (solo para desarrollo):  python -m pip install --user Pillow
 """
 
 import os
 import sys
+from collections import Counter
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter
+    from PIL import Image, ImageDraw
 except ImportError:
     sys.exit("Falta Pillow. Instálalo con:  python -m pip install --user Pillow")
 
@@ -31,108 +42,197 @@ RAIZ = os.path.dirname(AQUI)
 DESTINO = os.path.join(RAIZ, "iconos")
 FUENTE = os.path.join(DESTINO, "portada.jpg")
 
-# --- Encuadre -------------------------------------------------------------
-# Margen que se añade espejando la pared, en pixeles de la foto original.
-MARGEN_ARRIBA = 60
-MARGEN_DERECHA = 80
-# Hasta donde baja el recorte. Por debajo empieza el pantalon, que a tamaño
-# icono solo aporta una mancha verde sin forma.
-ALTO_UTIL = 841
+# Lado del recorte logico. Potencia de dos a proposito: ver cabecera.
+LADO_LOGICO = 64
+# Colores distintos por encima de los cuales dejamos de tratarlo como pixel art.
+MAX_COLORES_PIXEL_ART = 40
+# Dos colores mas cercanos que esto son el mismo color estropeado por el JPEG.
+DISTANCIA_FUSION = 40
 
-# La foto ya trae su propio fondo, asi que el relleno del «maskable» usa el
-# blanco de la pared en vez de un color inventado.
-COLOR_PARED = (243, 242, 240)
+TAMANOS = (180, 192, 512, 1024)
 
 
-# Pixeles del borde que se promedian para prolongar cada fila.
-MUESTRA_BORDE = 10
+# =========================================================================
+# Reconstruccion del pixel art
+# =========================================================================
+
+def medir_celda(im):
+    """Tamaño del pixel logico, por la distancia entre bordes fuertes."""
+    px = im.load()
+    W, H = im.size
+    distancias = []
+
+    for eje in ("x", "y"):
+        largo = W if eje == "x" else H
+        grad = [0] * largo
+        for i in range(1, largo):
+            s = 0
+            for j in range(0, (H if eje == "x" else W), 4):
+                a = px[i, j] if eje == "x" else px[j, i]
+                b = px[i - 1, j] if eje == "x" else px[j, i - 1]
+                s += abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])
+            grad[i] = s
+
+        umbral = max(grad) * 0.25
+        picos = [i for i in range(1, largo - 1)
+                 if grad[i] > umbral and grad[i] >= grad[i - 1] and grad[i] >= grad[i + 1]]
+        if not picos:
+            continue
+
+        # El JPEG ensancha cada borde en varios pixeles: se agrupan.
+        grupos, actual = [], [picos[0]]
+        for p in picos[1:]:
+            if p - actual[-1] <= 3:
+                actual.append(p)
+            else:
+                grupos.append(sum(actual) // len(actual))
+                actual = [p]
+        grupos.append(sum(actual) // len(actual))
+        distancias += [grupos[i + 1] - grupos[i] for i in range(len(grupos) - 1)]
+
+    if not distancias:
+        return None
+    return Counter(distancias).most_common(1)[0][0]
 
 
-def espejar_margen(im, arriba, derecha):
-    """Extiende el lienzo con mas pared.
+def desfase_rejilla(im, celda):
+    """Desfase que deja las celdas mas uniformes por dentro."""
+    px = im.load()
+    W, H = im.size
 
-    Dos tecnicas distintas, porque los dos bordes no son iguales:
+    def dispersion(offset):
+        total = n = 0
+        for cy in range(offset, H - celda, celda):
+            for cx in range(offset, W - celda, celda):
+                a = px[cx + 2, cy + 2]
+                b = px[cx + celda - 3, cy + celda - 3]
+                total += abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])
+                n += 1
+        return total / max(1, n)
 
-    Arriba se espeja el bloque entero. Las primeras filas son pared limpia en
-    todo el ancho —el cono empieza en y=78—, asi que el reflejo conserva la
-    textura del ladrillo sin traer nada mas.
+    return min(range(celda), key=dispersion)
 
-    A la derecha NO se puede espejar ni teselar. El primer intento teselaba una
-    franja «de pared» y salieron rayas naranjas repetidas: el JPEG deja un halo
-    calido alrededor del cono que pasa cualquier umbral de brillo. Aqui cada
-    fila se prolonga con el promedio de sus ultimos pixeles, de modo que las
-    juntas horizontales del ladrillo continuan solas y el halo, si lo hay, se
-    convierte en un degradado suave en vez de un patron repetido.
-    """
-    ancho, alto = im.size
 
-    alto_total = alto + arriba
-    vertical = Image.new("RGB", (ancho, alto_total))
-    vertical.paste(im, (0, arriba))
-    if arriba:
-        franja = im.crop((0, 0, ancho, arriba)).transpose(Image.FLIP_TOP_BOTTOM)
-        vertical.paste(franja, (0, 0))
+def reconstruir(im, celda, offset):
+    """Dibujo logico: un pixel por celda, con el color dominante de su centro."""
+    px = im.load()
+    W, H = im.size
+    cols = (W - offset) // celda
+    filas = (H - offset) // celda
+    margen = max(2, celda // 3)
 
-    if not derecha:
-        return vertical
+    logica = Image.new("RGB", (cols, filas))
+    lp = logica.load()
+    for j in range(filas):
+        for i in range(cols):
+            cx, cy = offset + i * celda, offset + j * celda
+            muestras = [px[x, y]
+                        for y in range(cy + margen, cy + celda - margen)
+                        for x in range(cx + margen, cx + celda - margen)]
+            lp[i, j] = Counter(muestras).most_common(1)[0][0]
+    return logica
 
-    lienzo = Image.new("RGB", (ancho + derecha, alto_total))
-    lienzo.paste(vertical, (0, 0))
 
-    origen = vertical.load()
-    dibujo = ImageDraw.Draw(lienzo)
-    for y in range(alto_total):
-        r = g = b = 0
-        for x in range(ancho - MUESTRA_BORDE, ancho):
-            pr, pg, pb = origen[x, y]
-            r += pr
-            g += pg
-            b += pb
-        n = MUESTRA_BORDE
-        dibujo.line(
-            [(ancho, y), (ancho + derecha, y)],
-            fill=(r // n, g // n, b // n),
-        )
+def fusionar_paleta(logica):
+    """Devuelve el dibujo con los colores casi iguales unificados."""
+    lp = logica.load()
+    W, H = logica.size
+    cuenta = Counter(lp[i, j] for j in range(H) for i in range(W))
 
-    # Un desenfoque leve solo en el margen suaviza el salto entre foto y relleno.
-    margen = lienzo.crop((ancho - 4, 0, ancho + derecha, alto_total))
-    lienzo.paste(margen.filter(ImageFilter.GaussianBlur(2.5)), (ancho - 4, 0))
+    paleta = []
+    for c, _ in cuenta.most_common():
+        if any(sum(abs(c[k] - p[k]) for k in range(3)) < DISTANCIA_FUSION for p in paleta):
+            continue
+        paleta.append(c)
 
+    for j in range(H):
+        for i in range(W):
+            c = lp[i, j]
+            lp[i, j] = min(paleta, key=lambda p: sum(abs(c[k] - p[k]) for k in range(3)))
+
+    return logica, paleta
+
+
+def recortar_a_la_figura(logica, fondo, lado):
+    """Recorta un cuadrado centrado en la figura, rellenando de fondo si hace falta."""
+    lp = logica.load()
+    W, H = logica.size
+    puntos = [(i, j) for j in range(H) for i in range(W) if lp[i, j] != fondo]
+    if not puntos:
+        return logica.resize((lado, lado), Image.NEAREST)
+
+    xs = [p[0] for p in puntos]
+    ys = [p[1] for p in puntos]
+    cx = (min(xs) + max(xs)) // 2
+    cy = (min(ys) + max(ys)) // 2
+
+    izq = cx - lado // 2
+    arriba = cy - lado // 2
+
+    lienzo = Image.new("RGB", (lado, lado), fondo)
+    x0, y0 = max(0, izq), max(0, arriba)
+    x1, y1 = min(W, izq + lado), min(H, arriba + lado)
+    lienzo.paste(logica.crop((x0, y0, x1, y1)), (x0 - izq, y0 - arriba))
     return lienzo
 
 
-def componer_cuadrado():
-    """Devuelve el cuadrado maestro, a la maxima resolucion posible."""
-    im = Image.open(FUENTE).convert("RGB")
-    recorte = im.crop((0, 0, im.width, min(ALTO_UTIL, im.height)))
-    extendido = espejar_margen(recorte, MARGEN_ARRIBA, MARGEN_DERECHA)
+def maestro_pixel_art(im):
+    celda = medir_celda(im)
+    if not celda or celda < 3:
+        return None, None
 
-    lado = extendido.width
-    if extendido.height < lado:
-        # Falta alto: se completa espejando tambien por abajo.
-        falta = lado - extendido.height
-        franja = extendido.crop((0, extendido.height - falta, lado, extendido.height))
-        completo = Image.new("RGB", (lado, lado))
-        completo.paste(extendido, (0, 0))
-        completo.paste(franja.transpose(Image.FLIP_TOP_BOTTOM), (0, extendido.height))
-        extendido = completo
+    offset = desfase_rejilla(im, celda)
+    logica = reconstruir(im, celda, offset)
+    logica, paleta = fusionar_paleta(logica)
+    if len(paleta) > MAX_COLORES_PIXEL_ART:
+        return None, None
 
-    return extendido.crop((0, 0, lado, lado))
+    fondo = Counter(logica.load()[i, j]
+                    for j in range(logica.height)
+                    for i in range(logica.width)).most_common(1)[0][0]
+
+    print(f"  pixel art: celda {celda} px, desfase {offset}, "
+          f"{logica.width}x{logica.height} celdas, {len(paleta)} colores")
+    return recortar_a_la_figura(logica, fondo, LADO_LOGICO), fondo
 
 
-def version_maskable(maestro, lado=512):
-    """Android recorta en circulo: el cono tiene que caber en el 80 % central."""
-    margen = int(lado * 0.12)
+def maestro_foto(im):
+    """Camino alternativo: recorte cuadrado centrado, para una portada normal."""
+    lado = min(im.size)
+    izq = (im.width - lado) // 2
+    arriba = (im.height - lado) // 2
+    print(f"  foto: recorte centrado de {lado}x{lado}")
+    return im.crop((izq, arriba, izq + lado, arriba + lado)), (243, 242, 240)
+
+
+# =========================================================================
+# Salidas
+# =========================================================================
+
+def escalar(maestro, lado, pixel_art):
+    filtro = Image.NEAREST if pixel_art else Image.LANCZOS
+    return maestro.resize((lado, lado), filtro)
+
+
+def version_maskable(maestro, fondo, pixel_art, lado=512):
+    """Android recorta en circulo: la figura va dentro del 80 % central."""
+    margen = int(lado * 0.10)
     interior = lado - 2 * margen
-    lienzo = Image.new("RGB", (lado, lado), COLOR_PARED)
-    lienzo.paste(maestro.resize((interior, interior), Image.LANCZOS), (margen, margen))
+    # Se ajusta el interior a un multiplo del lado logico para no romper la
+    # rejilla: si no, los pixeles salen de anchos distintos.
+    if pixel_art:
+        factor = max(1, interior // maestro.width)
+        interior = factor * maestro.width
+        margen = (lado - interior) // 2
+
+    lienzo = Image.new("RGB", (lado, lado), fondo)
+    lienzo.paste(escalar(maestro, interior, pixel_art), (margen, margen))
     return lienzo
 
 
-def enmascarar(maestro, lado):
-    """Aplica la mascara redondeada de iOS. El radio real de iOS es el 22,37 %
-    del lado; con eso se ve exactamente que se come la esquina."""
-    icono = maestro.resize((lado, lado), Image.LANCZOS).convert("RGBA")
+def enmascarar(maestro, lado, pixel_art):
+    """Mascara redondeada de iOS: radio del 22,37 % del lado."""
+    icono = escalar(maestro, lado, pixel_art).convert("RGBA")
     mascara = Image.new("L", (lado, lado), 0)
     ImageDraw.Draw(mascara).rounded_rectangle(
         (0, 0, lado - 1, lado - 1), radius=int(lado * 0.2237), fill=255
@@ -142,28 +242,17 @@ def enmascarar(maestro, lado):
     return salida
 
 
-def maqueta_pantalla_inicio(maestro, nombre="finc"):
-    """Simula como queda en la pantalla de inicio: tres tamaños reales sobre un
-    fondo oscuro, con el nombre debajo. Sirve para comprobar el encuadre sin
-    tener que instalar la app en el telefono."""
-    fondo = (26, 28, 36)
-    ancho, alto = 640, 300
-    lienzo = Image.new("RGB", (ancho, alto), fondo)
+def maqueta_pantalla_inicio(maestro, pixel_art, nombre="finc"):
+    """Como queda en la pantalla de inicio, a tres tamaños reales."""
+    lienzo = Image.new("RGB", (640, 300), (26, 28, 36))
     dibujo = ImageDraw.Draw(lienzo)
-
-    tamanos = [(180, "180 px"), (120, "120 px"), (60, "60 px, tamano real")]
-    # Base comun, como en una fila de la pantalla de inicio: los iconos se
-    # apoyan en la misma linea y las etiquetas quedan alineadas debajo.
-    base = 230
-    x = 50
-    for lado, etiqueta in tamanos:
-        y = base - lado
-        icono = enmascarar(maestro, lado)
-        lienzo.paste(icono, (x, y), icono)
+    base, x = 230, 50
+    for lado, etiqueta in ((180, "180 px"), (120, "120 px"), (60, "60 px, tamano real")):
+        icono = enmascarar(maestro, lado, pixel_art)
+        lienzo.paste(icono, (x, base - lado), icono)
         dibujo.text((x, base + 10), nombre, fill=(236, 238, 245))
         dibujo.text((x, base + 26), etiqueta, fill=(120, 128, 150))
         x += lado + 55
-
     return lienzo
 
 
@@ -171,25 +260,33 @@ def main():
     if not os.path.exists(FUENTE):
         sys.exit(f"No encuentro la portada en {FUENTE}")
 
+    im = Image.open(FUENTE).convert("RGB")
+    print(f"  portada: {im.width}x{im.height}")
+
+    maestro, fondo = maestro_pixel_art(im)
+    pixel_art = maestro is not None
+    if not pixel_art:
+        maestro, fondo = maestro_foto(im)
+
     os.makedirs(DESTINO, exist_ok=True)
-    maestro = componer_cuadrado()
-    print(f"  cuadrado maestro: {maestro.width}x{maestro.height}")
+    maestro.save(os.path.join(DESTINO, "logica.png"))
+    print(f"  iconos/logica.png  ({maestro.width}x{maestro.height}, el original limpio)")
 
-    for lado in (180, 192, 512, 1024):
-        ruta = os.path.join(DESTINO, f"icono-{lado}.png")
-        maestro.resize((lado, lado), Image.LANCZOS).save(ruta, optimize=True)
-        print(f"  iconos/icono-{lado}.png")
+    for lado in TAMANOS:
+        exacto = pixel_art and lado % maestro.width == 0
+        escalar(maestro, lado, pixel_art).save(
+            os.path.join(DESTINO, f"icono-{lado}.png"), optimize=True)
+        print(f"  iconos/icono-{lado}.png{'  (x' + str(lado // maestro.width) + ' exacto)' if exacto else ''}")
 
-    ruta = os.path.join(DESTINO, "icono-maskable-512.png")
-    version_maskable(maestro).save(ruta, optimize=True)
+    version_maskable(maestro, fondo, pixel_art).save(
+        os.path.join(DESTINO, "icono-maskable-512.png"), optimize=True)
     print("  iconos/icono-maskable-512.png")
 
-    ruta = os.path.join(DESTINO, "previsualizacion.png")
-    enmascarar(maestro, 240).save(ruta)
+    enmascarar(maestro, 240, pixel_art).save(os.path.join(DESTINO, "previsualizacion.png"))
     print("  iconos/previsualizacion.png  (con la máscara de iOS aplicada)")
 
-    ruta = os.path.join(DESTINO, "pantalla-inicio.png")
-    maqueta_pantalla_inicio(maestro).save(ruta)
+    maqueta_pantalla_inicio(maestro, pixel_art).save(
+        os.path.join(DESTINO, "pantalla-inicio.png"))
     print("  iconos/pantalla-inicio.png  (cómo queda en el móvil)")
 
 

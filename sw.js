@@ -6,7 +6,7 @@
  * es la fuente de verdad y el dominio nunca sale del dispositivo.
  */
 
-const VERSION = 'v6';
+const VERSION = 'v7';
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 
@@ -41,8 +41,8 @@ const PRECARGA = [
   './src/dominio/sobrante.js',
   './src/ui/componentes.js',
   './src/ui/hojas.js',
-  './iconos/icono-180.png',
-  './iconos/icono-192.png',
+  './iconos/icono-180.png?v=2',
+  './iconos/icono-192.png?v=2',
 ];
 
 self.addEventListener('install', (evento) => {
@@ -159,8 +159,8 @@ self.addEventListener('push', (evento) => {
 
       await self.registration.showNotification(titulo, {
         body: cuerpo,
-        icon: './iconos/icono-180.png',
-        badge: './iconos/icono-180.png',
+        icon: './iconos/icono-180.png?v=2',
+        badge: './iconos/icono-180.png?v=2',
         tag: plantilla,
         data: { plantilla },
       });
