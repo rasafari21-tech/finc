@@ -297,6 +297,7 @@ export function crearComandos(repo, reloj) {
       const aplicado = aplicarVeredicto(mov, veredicto, {
         justificacion: cmd.justificacion,
         aceptaForzado: cmd.aceptaForzado,
+        confirmado: cmd.confirmado,
       });
 
       if (!aplicado.permitido) {
@@ -323,9 +324,11 @@ export function crearComandos(repo, reloj) {
       const evento =
         veredicto.tipo === 'FORCE'
           ? { tipo: 'REGLA_FORZADO', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { de: definitivo.bucketOriginal, a: definitivo.bucket } }
-          : definitivo.justificacion
-            ? { tipo: 'REGLA_ANULADA', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { justificacion: definitivo.justificacion } }
-            : null;
+          : veredicto.tipo === 'AVISO'
+            ? { tipo: 'REGLA_AVISO', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { bucket: definitivo.bucket, importeCents: definitivo.importeCents } }
+            : definitivo.justificacion
+              ? { tipo: 'REGLA_ANULADA', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { justificacion: definitivo.justificacion } }
+              : null;
 
       const actualizado = { ...periodo, totales };
 
@@ -346,7 +349,14 @@ export function crearComandos(repo, reloj) {
         });
       }
 
-      return { ok: true, movimiento: definitivo, veredicto, periodo: actualizado, rebasado: excedido };
+      return {
+        ok: true,
+        movimiento: definitivo,
+        veredicto,
+        aviso: aplicado.aviso ? veredicto : null,
+        periodo: actualizado,
+        rebasado: excedido,
+      };
     },
 
     // --- ingresos informales ---------------------------------------------

@@ -349,6 +349,10 @@ const acciones = {
     await guardar(s.captura);
   },
 
+  async 'confirmar-importe'(_el, s) {
+    await guardar({ ...s.captura, confirmado: true });
+  },
+
   async 'confirmar-con-justificacion'(_el, s) {
     const texto = capaHojas.querySelector('[data-campo="justificacion"]')?.value ?? '';
     if (texto.trim().length < 15) {
@@ -619,6 +623,7 @@ async function guardar(captura) {
     justificacion: captura.justificacion,
     comercioTipo: captura.comercioTipo,
     aceptaForzado: captura.forzado,
+    confirmado: captura.confirmado,
   };
 
   const r = await comandos.registrarGasto(cmd);
@@ -639,7 +644,13 @@ async function guardar(captura) {
   vibrar(14);
   estado.set({ captura: capturaVacia(), hoja: null });
   await refrescar();
-  brindar(r.rebasado ? `${formatear(centavos)} · techo rebasado` : `Guardado ${formatear(centavos)}`, r.movimiento.id);
+
+  const texto = r.aviso
+    ? `${formatear(centavos)} · ${r.aviso.mensaje}`
+    : r.rebasado
+      ? `${formatear(centavos)} · techo rebasado`
+      : `Guardado ${formatear(centavos)}`;
+  brindar(texto, r.movimiento.id);
 }
 
 /** Camino unico de registro de ingresos informales. */

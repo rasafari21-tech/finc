@@ -6,7 +6,7 @@
  * es la fuente de verdad y el dominio nunca sale del dispositivo.
  */
 
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 
@@ -14,8 +14,8 @@ const PRECARGA = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './estilos/app.css?v=3',
-  './src/app/main.js?v=3',
+  './estilos/app.css?v=4',
+  './src/app/main.js?v=4',
   './src/app/comandos.js',
   './src/app/estado.js',
   './src/app/reloj.js',

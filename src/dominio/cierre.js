@@ -154,6 +154,7 @@ export function generarInforme(periodo, movimientos, eventos, carry, extra = {})
   const rechazos = eventos.filter((e) => e.tipo === 'REGLA_RECHAZO');
   const forzados = eventos.filter((e) => e.tipo === 'REGLA_FORZADO');
   const excepciones = eventos.filter((e) => e.tipo === 'REGLA_ANULADA');
+  const avisos = eventos.filter((e) => e.tipo === 'REGLA_AVISO');
 
   const gastos = movimientos.filter((m) => m.tipo === 'gasto');
   const ingresos = movimientos.filter((m) => m.tipo === 'ingreso');
@@ -178,7 +179,8 @@ export function generarInforme(periodo, movimientos, eventos, carry, extra = {})
       rechazos: rechazos.length,
       forzados: forzados.length,
       excepciones: excepciones.length,
-      porRegla: contarPorRegla([...rechazos, ...forzados, ...excepciones]),
+      avisos: avisos.length,
+      porRegla: contarPorRegla([...rechazos, ...forzados, ...excepciones, ...avisos]),
     },
     sobranteCents: extra.sobrante?.sobranteCents ?? 0,
     sobranteDesglose: extra.sobrante?.desglose ?? null,

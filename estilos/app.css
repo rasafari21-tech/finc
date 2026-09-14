@@ -1,6 +1,12 @@
 /* finc — hoja de estilo unica.
+
    Movil primero. Todo control interactivo vive por debajo del 55 % de la
-   altura de pantalla: la cabecera y las barras se leen, no se tocan. */
+   altura de pantalla: la cabecera y las barras se leen, no se tocan.
+
+   Tema SIEMPRE claro, a proposito: no hay variantes segun el modo del
+   sistema. La app se ve igual lleve el telefono el ajuste que lleve. Si
+   alguna vez se quisiera modo oscuro, se añade redefiniendo los tokens de
+   :root, nunca metiendo colores dentro de los componentes. */
 
 :root {
   --paper: #f2f3f6;
@@ -22,46 +28,6 @@
   --radio: 10px;
   --seguro-inf: env(safe-area-inset-bottom, 0px);
   --seguro-sup: env(safe-area-inset-top, 0px);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-tema='claro']) {
-    --paper: #0f1118;
-    --sup: #171a24;
-    --sup-2: #1e2230;
-    --sup-3: #262b3b;
-    --tinta: #e7eaf3;
-    --tinta-2: #a8afc3;
-    --tinta-3: #79819a;
-    --linea: #2b3142;
-    --acento: #94a6f2;
-    --acento-suave: #212949;
-    --ok: #54c08c;
-    --ok-suave: #13301f;
-    --mal: #f0867a;
-    --mal-suave: #3a1d19;
-    --avisa: #dcb25c;
-    --avisa-suave: #33290f;
-  }
-}
-
-:root[data-tema='oscuro'] {
-  --paper: #0f1118;
-  --sup: #171a24;
-  --sup-2: #1e2230;
-  --sup-3: #262b3b;
-  --tinta: #e7eaf3;
-  --tinta-2: #a8afc3;
-  --tinta-3: #79819a;
-  --linea: #2b3142;
-  --acento: #94a6f2;
-  --acento-suave: #212949;
-  --ok: #54c08c;
-  --ok-suave: #13301f;
-  --mal: #f0867a;
-  --mal-suave: #3a1d19;
-  --avisa: #dcb25c;
-  --avisa-suave: #33290f;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -157,8 +123,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   background: var(--sup-3);
 }
 .aviso button.principal { background: var(--acento); color: var(--sup); }
-@media (prefers-color-scheme: dark) { .aviso button.principal { color: var(--paper); } }
-
 /* ---------- barras de techo ---------- */
 
 .techos { display: grid; gap: 7px; margin-bottom: 10px; }
@@ -273,7 +237,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   display: grid; place-items: center;
   transition: opacity 120ms;
 }
-@media (prefers-color-scheme: dark) { .confirmar { color: var(--paper); } }
 .confirmar[disabled] { opacity: .35; }
 .confirmar:active:not([disabled]) { opacity: .85; }
 
@@ -310,7 +273,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   text-align: center; background: var(--sup-2);
 }
 .btn.principal { background: var(--acento); color: var(--sup); }
-@media (prefers-color-scheme: dark) { .btn.principal { color: var(--paper); } }
 .btn.peligro { background: var(--mal-suave); color: var(--mal); }
 /* Dentro del boton destacado el texto secundario hereda el color del boton:
    var(--tinta-2) sobre el acento queda azul sobre azul e ilegible. */
@@ -358,8 +320,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   font-size: 13px; font-weight: 500;
 }
 .etiquetas button[aria-pressed='true'] { background: var(--acento); color: var(--sup); }
-@media (prefers-color-scheme: dark) { .etiquetas button[aria-pressed='true'] { color: var(--paper); } }
-
 .interruptor { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; }
 .interruptor .txt { font-size: 14.5px; }
 .interruptor .txt small { display: block; color: var(--tinta-3); font-size: 12px; }

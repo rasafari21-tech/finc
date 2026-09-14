@@ -241,36 +241,38 @@ test('R-13 · un viaje no es transporte esencial', () => {
   assert.equal(v.ruleId, 'R-13');
 });
 
-test('R-14 · mas de un cuarto del techo avisa, pero no bloquea', () => {
-  const v = evaluarMovimiento(mov({ bucket: ESENCIALES, importeCents: 200_000_00 }), CTX);
-  assert.equal(v.tipo, 'WARN');
-  assert.equal(v.ruleId, 'R-14');
-  assert.equal(v.anulable, true);
-});
-
-test('R-14 · con justificacion suficiente, la escritura procede', () => {
+test('R-14 · avisa pero NO interrumpe ni pide escribir', () => {
   const m = mov({ bucket: ESENCIALES, importeCents: 200_000_00 });
   const v = evaluarMovimiento(m, CTX);
-  const sinNota = aplicarVeredicto(m, v, {});
-  assert.equal(sinNota.permitido, false);
-  assert.equal(sinNota.requiere, 'justificacion');
+  assert.equal(v.tipo, 'AVISO');
+  assert.equal(v.ruleId, 'R-14');
 
-  const conNota = aplicarVeredicto(m, v, { justificacion: 'Pago anual del seguro del piso' });
-  assert.equal(conNota.permitido, true);
+  const r = aplicarVeredicto(m, v, {});
+  assert.equal(r.permitido, true, 'mover un cuarto del techo de golpe es normal, no sospechoso');
+  assert.equal(r.aviso, true, 'queda anotado para el informe del mes');
+  assert.equal(r.requiere, undefined, 'no pide justificacion');
 });
 
-test('R-15 · el tercer capricho en 24 h avisa del patron', () => {
+test('R-14 · tampoco pide justificacion en Inversión, Reserva ni Recompensas', () => {
+  for (const bucket of [INVERSION, RESERVA, RECOMPENSAS]) {
+    const m = mov({ bucket, importeCents: 200_000_00, destinoId: 'cachinha', razonReserva: 'SALUD' });
+    const v = evaluarMovimiento(m, CTX);
+    const r = aplicarVeredicto(m, v, {});
+    assert.equal(r.permitido, true, `${bucket} quedo bloqueado por ${v.ruleId}`);
+  }
+});
+
+test('R-15 · el tercer capricho en 24 h avisa, sin frenar nada', () => {
   const base = Date.parse('2026-09-15T12:00:00Z');
   const recientes = [
     { bucket: RECOMPENSAS, tipo: 'gasto', ts: base - 3_600_000 },
     { bucket: RECOMPENSAS, tipo: 'gasto', ts: base - 7_200_000 },
   ];
-  const v = evaluarMovimiento(
-    mov({ bucket: RECOMPENSAS, categoryId: 'ocio', importeCents: 3000_00, ts: base }),
-    { ...CTX, movimientosRecientes: recientes },
-  );
+  const m = mov({ bucket: RECOMPENSAS, categoryId: 'ocio', importeCents: 3000_00, ts: base });
+  const v = evaluarMovimiento(m, { ...CTX, movimientosRecientes: recientes });
   assert.equal(v.ruleId, 'R-15');
-  assert.equal(v.tipo, 'WARN');
+  assert.equal(v.tipo, 'AVISO');
+  assert.equal(aplicarVeredicto(m, v, {}).permitido, true);
 });
 
 test('R-15 · con solo uno previo no dice nada', () => {
@@ -289,12 +291,17 @@ test('R-16 · no se registran gastos futuros', () => {
   assert.equal(v.anulable, false);
 });
 
-test('R-17 · importe absurdo se frena, pero se puede confirmar', () => {
-  const v = evaluarMovimiento(mov({ importeCents: 50_000_00 * 200 }), CTX);
+test('R-17 · importe absurdo se frena, y basta un toque para seguir', () => {
+  const m = mov({ importeCents: 50_000_00 * 200 });
+  const v = evaluarMovimiento(m, CTX);
   assert.equal(v.ruleId, 'R-17');
-  assert.equal(v.anulable, true);
-  const r = aplicarVeredicto(mov({ importeCents: 50_000_00 * 200 }), v, { justificacion: 'Es la entrada del coche, confirmado' });
-  assert.equal(r.permitido, true);
+  assert.equal(v.tipo, 'CONFIRMAR');
+
+  const sinConfirmar = aplicarVeredicto(m, v, {});
+  assert.equal(sinConfirmar.permitido, false);
+  assert.equal(sinConfirmar.requiere, 'confirmacion', 'un si o un no, no un texto');
+
+  assert.equal(aplicarVeredicto(m, v, { confirmado: true }).permitido, true);
 });
 
 test('R-18 · el mes cerrado es inmutable', () => {

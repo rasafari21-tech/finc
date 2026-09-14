@@ -46,11 +46,14 @@ export const REGLAS_NUCLEO = [
     prioridad: 6,
     nucleo: true,
     anulable: true,
-    accion: 'DENY',
+    // CONFIRMAR, no DENY: basta un toque. Aqui no se escribe nada, solo se
+    // dice si el numero es el que querias. Es una red contra el dedo gordo,
+    // no una justificacion.
+    accion: 'CONFIRMAR',
     cuando: { op: 'or', args: [op('importeNoPositivo'), op('importeAtipico', 100)] },
-    mensaje: 'Ese importe no cuadra.',
+    mensaje: '¿Ese importe es correcto?',
     porque:
-      'Es cien veces mayor que tu gasto habitual, o no es un número positivo. Suele ser un error de tecleo; si es correcto, confírmalo.',
+      'Es cien veces mayor que tu gasto habitual. Casi siempre es un cero de más al teclear; si de verdad era eso, sigue adelante.',
   },
   {
     id: 'R-01',
@@ -247,22 +250,23 @@ export const REGLAS_NUCLEO = [
     prioridad: 80,
     nucleo: true,
     anulable: true,
-    accion: 'WARN',
+    // AVISO: no interrumpe ni pide escribir. Mover medio techo a la Cachinha
+    // de una vez es lo normal, no algo que haya que justificar. Queda anotado
+    // y aparece en el informe del mes, que es donde sirve de algo.
+    accion: 'AVISO',
     cuando: y(op('tipoEs', 'gasto'), op('fraccionDelTechoMayorQue', 0.25)),
-    mensaje: 'Es más de un cuarto del techo de golpe.',
-    porque:
-      'No lo bloqueo, pero quiero que lo confirmes y dejes escrito qué fue. Aparecerá señalado en el informe del mes.',
+    mensaje: 'Más de un cuarto del techo de una vez.',
+    porque: 'Queda anotado y saldrá en el informe del mes.',
   },
   {
     id: 'R-15',
     prioridad: 85,
     nucleo: true,
     anulable: true,
-    accion: 'WARN',
+    accion: 'AVISO',
     cuando: y(op('bucketEs', RECOMPENSAS), op('tipoEs', 'gasto'), op('conteoRecienteAlMenos', RECOMPENSAS, 24, 3)),
     mensaje: 'Tercer capricho en 24 horas.',
-    porque:
-      'No es un aviso sobre el importe, es sobre el patrón. Sigue adelante si estás conforme; solo quería que lo vieras escrito.',
+    porque: 'No es por el importe, es por el patrón. Solo para que lo veas.',
   },
 ];
 

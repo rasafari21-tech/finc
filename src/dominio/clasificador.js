@@ -97,10 +97,22 @@ export function sugerirDestino(mov, veredicto, ctx = {}) {
  *
  * @returns {{ permitido: boolean, mov: Object, veredicto: Veredicto, requiere?: string }}
  */
-export function aplicarVeredicto(mov, veredicto, { justificacion, aceptaForzado } = {}) {
+export function aplicarVeredicto(mov, veredicto, { justificacion, aceptaForzado, confirmado } = {}) {
   switch (veredicto.tipo) {
     case 'OK':
       return { permitido: true, mov, veredicto };
+
+    // Informa y deja pasar. No interrumpe ni pide escribir nada: queda
+    // anotado en la bitacora y sale en el informe del mes, que es donde un
+    // patron de gasto significa algo. Interrumpir aqui solo enseña al usuario
+    // a teclear cualquier cosa para quitarse el cartel de encima.
+    case 'AVISO':
+      return { permitido: true, mov, veredicto, aviso: true };
+
+    // Un toque, no una redaccion. Protege del cero de mas al teclear.
+    case 'CONFIRMAR':
+      if (confirmado) return { permitido: true, mov, veredicto };
+      return { permitido: false, mov, veredicto, requiere: 'confirmacion' };
 
     case 'FORCE':
       // Un FORCE no se aplica en silencio. Mover el gasto a Recompensas sin

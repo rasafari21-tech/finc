@@ -59,6 +59,11 @@ export function hojaRechazo({ veredicto, sugerencia, requiere, captura }) {
       ${veredicto.ruleId === 'R-10' ? interruptorCampo('relacionadaConIngreso', 'Se relaciona con mi trabajo', captura) : ''}
       <button class="btn principal" data-accion="reintentar">Volver a intentar</button>
       ${destino ? `<button class="btn" data-accion="aceptar-destino" data-bucket="${destino}">Guardar en ${esc(ETIQUETAS[destino])}</button>` : ''}`;
+  } else if (requiere === 'confirmacion') {
+    // Un si o un no. Sin campo de texto: no se justifica, se confirma.
+    acciones = `
+      <button class="btn principal" data-accion="confirmar-importe">Sí, es correcto</button>
+      <button class="btn" data-accion="cerrar-hoja">Lo corrijo</button>`;
   } else if (requiere === 'justificacion') {
     acciones = `
       <div class="campo">
@@ -90,9 +95,11 @@ export function hojaRechazo({ veredicto, sugerencia, requiere, captura }) {
     ${requisitos}
     ${chip}
     <div class="botones">${acciones}</div>
-    <p style="font-size:11.5px;color:var(--tinta-3);text-align:center;margin:14px 0 0">
-      Regla ${esc(veredicto.ruleId ?? '—')}${veredicto.anulable ? '' : ' · no se puede desactivar'}
-    </p>`);
+    ${requiere === 'confirmacion'
+      ? ''
+      : `<p style="font-size:11.5px;color:var(--tinta-3);text-align:center;margin:14px 0 0">
+           Regla ${esc(veredicto.ruleId ?? '—')}${veredicto.anulable ? '' : ' · no se puede desactivar'}
+         </p>`}`);
 }
 
 function etiquetasSugeridas(veredicto, captura) {

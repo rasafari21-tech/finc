@@ -4,12 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>finc · prueba</title>
-<meta name="theme-color" content="#f2f3f6" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0f1118" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f3f6">
 <style>
 /* finc — hoja de estilo unica.
+
    Movil primero. Todo control interactivo vive por debajo del 55 % de la
-   altura de pantalla: la cabecera y las barras se leen, no se tocan. */
+   altura de pantalla: la cabecera y las barras se leen, no se tocan.
+
+   Tema SIEMPRE claro, a proposito: no hay variantes segun el modo del
+   sistema. La app se ve igual lleve el telefono el ajuste que lleve. Si
+   alguna vez se quisiera modo oscuro, se añade redefiniendo los tokens de
+   :root, nunca metiendo colores dentro de los componentes. */
 
 :root {
   --paper: #f2f3f6;
@@ -31,46 +36,6 @@
   --radio: 10px;
   --seguro-inf: env(safe-area-inset-bottom, 0px);
   --seguro-sup: env(safe-area-inset-top, 0px);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-tema='claro']) {
-    --paper: #0f1118;
-    --sup: #171a24;
-    --sup-2: #1e2230;
-    --sup-3: #262b3b;
-    --tinta: #e7eaf3;
-    --tinta-2: #a8afc3;
-    --tinta-3: #79819a;
-    --linea: #2b3142;
-    --acento: #94a6f2;
-    --acento-suave: #212949;
-    --ok: #54c08c;
-    --ok-suave: #13301f;
-    --mal: #f0867a;
-    --mal-suave: #3a1d19;
-    --avisa: #dcb25c;
-    --avisa-suave: #33290f;
-  }
-}
-
-:root[data-tema='oscuro'] {
-  --paper: #0f1118;
-  --sup: #171a24;
-  --sup-2: #1e2230;
-  --sup-3: #262b3b;
-  --tinta: #e7eaf3;
-  --tinta-2: #a8afc3;
-  --tinta-3: #79819a;
-  --linea: #2b3142;
-  --acento: #94a6f2;
-  --acento-suave: #212949;
-  --ok: #54c08c;
-  --ok-suave: #13301f;
-  --mal: #f0867a;
-  --mal-suave: #3a1d19;
-  --avisa: #dcb25c;
-  --avisa-suave: #33290f;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -166,8 +131,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   background: var(--sup-3);
 }
 .aviso button.principal { background: var(--acento); color: var(--sup); }
-@media (prefers-color-scheme: dark) { .aviso button.principal { color: var(--paper); } }
-
 /* ---------- barras de techo ---------- */
 
 .techos { display: grid; gap: 7px; margin-bottom: 10px; }
@@ -282,7 +245,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   display: grid; place-items: center;
   transition: opacity 120ms;
 }
-@media (prefers-color-scheme: dark) { .confirmar { color: var(--paper); } }
 .confirmar[disabled] { opacity: .35; }
 .confirmar:active:not([disabled]) { opacity: .85; }
 
@@ -319,7 +281,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   text-align: center; background: var(--sup-2);
 }
 .btn.principal { background: var(--acento); color: var(--sup); }
-@media (prefers-color-scheme: dark) { .btn.principal { color: var(--paper); } }
 .btn.peligro { background: var(--mal-suave); color: var(--mal); }
 /* Dentro del boton destacado el texto secundario hereda el color del boton:
    var(--tinta-2) sobre el acento queda azul sobre azul e ilegible. */
@@ -367,8 +328,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   font-size: 13px; font-weight: 500;
 }
 .etiquetas button[aria-pressed='true'] { background: var(--acento); color: var(--sup); }
-@media (prefers-color-scheme: dark) { .etiquetas button[aria-pressed='true'] { color: var(--paper); } }
-
 .interruptor { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; }
 .interruptor .txt { font-size: 14.5px; }
 .interruptor .txt small { display: block; color: var(--tinta-3); font-size: 12px; }
@@ -822,6 +781,10 @@ const acciones = {
     await guardar(s.captura);
   },
 
+  async 'confirmar-importe'(_el, s) {
+    await guardar({ ...s.captura, confirmado: true });
+  },
+
   async 'confirmar-con-justificacion'(_el, s) {
     const texto = capaHojas.querySelector('[data-campo="justificacion"]')?.value ?? '';
     if (texto.trim().length < 15) {
@@ -1092,6 +1055,7 @@ async function guardar(captura) {
     justificacion: captura.justificacion,
     comercioTipo: captura.comercioTipo,
     aceptaForzado: captura.forzado,
+    confirmado: captura.confirmado,
   };
 
   const r = await comandos.registrarGasto(cmd);
@@ -1112,7 +1076,13 @@ async function guardar(captura) {
   vibrar(14);
   estado.set({ captura: capturaVacia(), hoja: null });
   await refrescar();
-  brindar(r.rebasado ? `${formatear(centavos)} · techo rebasado` : `Guardado ${formatear(centavos)}`, r.movimiento.id);
+
+  const texto = r.aviso
+    ? `${formatear(centavos)} · ${r.aviso.mensaje}`
+    : r.rebasado
+      ? `${formatear(centavos)} · techo rebasado`
+      : `Guardado ${formatear(centavos)}`;
+  brindar(texto, r.movimiento.id);
 }
 
 /** Camino unico de registro de ingresos informales. */
@@ -2916,6 +2886,7 @@ function crearComandos(repo, reloj) {
       const aplicado = aplicarVeredicto(mov, veredicto, {
         justificacion: cmd.justificacion,
         aceptaForzado: cmd.aceptaForzado,
+        confirmado: cmd.confirmado,
       });
 
       if (!aplicado.permitido) {
@@ -2942,9 +2913,11 @@ function crearComandos(repo, reloj) {
       const evento =
         veredicto.tipo === 'FORCE'
           ? { tipo: 'REGLA_FORZADO', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { de: definitivo.bucketOriginal, a: definitivo.bucket } }
-          : definitivo.justificacion
-            ? { tipo: 'REGLA_ANULADA', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { justificacion: definitivo.justificacion } }
-            : null;
+          : veredicto.tipo === 'AVISO'
+            ? { tipo: 'REGLA_AVISO', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { bucket: definitivo.bucket, importeCents: definitivo.importeCents } }
+            : definitivo.justificacion
+              ? { tipo: 'REGLA_ANULADA', ruleId: veredicto.ruleId, periodId: mov.periodId, detalle: { justificacion: definitivo.justificacion } }
+              : null;
 
       const actualizado = { ...periodo, totales };
 
@@ -2965,7 +2938,14 @@ function crearComandos(repo, reloj) {
         });
       }
 
-      return { ok: true, movimiento: definitivo, veredicto, periodo: actualizado, rebasado: excedido };
+      return {
+        ok: true,
+        movimiento: definitivo,
+        veredicto,
+        aviso: aplicado.aviso ? veredicto : null,
+        periodo: actualizado,
+        rebasado: excedido,
+      };
     },
 
     // --- ingresos informales ---------------------------------------------
@@ -4317,6 +4297,11 @@ function hojaRechazo({ veredicto, sugerencia, requiere, captura }) {
       ${veredicto.ruleId === 'R-10' ? interruptorCampo('relacionadaConIngreso', 'Se relaciona con mi trabajo', captura) : ''}
       <button class="btn principal" data-accion="reintentar">Volver a intentar</button>
       ${destino ? `<button class="btn" data-accion="aceptar-destino" data-bucket="${destino}">Guardar en ${esc(ETIQUETAS[destino])}</button>` : ''}`;
+  } else if (requiere === 'confirmacion') {
+    // Un si o un no. Sin campo de texto: no se justifica, se confirma.
+    acciones = `
+      <button class="btn principal" data-accion="confirmar-importe">Sí, es correcto</button>
+      <button class="btn" data-accion="cerrar-hoja">Lo corrijo</button>`;
   } else if (requiere === 'justificacion') {
     acciones = `
       <div class="campo">
@@ -4348,9 +4333,11 @@ function hojaRechazo({ veredicto, sugerencia, requiere, captura }) {
     ${requisitos}
     ${chip}
     <div class="botones">${acciones}</div>
-    <p style="font-size:11.5px;color:var(--tinta-3);text-align:center;margin:14px 0 0">
-      Regla ${esc(veredicto.ruleId ?? '—')}${veredicto.anulable ? '' : ' · no se puede desactivar'}
-    </p>`);
+    ${requiere === 'confirmacion'
+      ? ''
+      : `<p style="font-size:11.5px;color:var(--tinta-3);text-align:center;margin:14px 0 0">
+           Regla ${esc(veredicto.ruleId ?? '—')}${veredicto.anulable ? '' : ' · no se puede desactivar'}
+         </p>`}`);
 }
 
 function etiquetasSugeridas(veredicto, captura) {
@@ -5790,10 +5777,22 @@ function sugerirDestino(mov, veredicto, ctx = {}) {
  *
  * @returns {{ permitido: boolean, mov: Object, veredicto: Veredicto, requiere?: string }}
  */
-function aplicarVeredicto(mov, veredicto, { justificacion, aceptaForzado } = {}) {
+function aplicarVeredicto(mov, veredicto, { justificacion, aceptaForzado, confirmado } = {}) {
   switch (veredicto.tipo) {
     case 'OK':
       return { permitido: true, mov, veredicto };
+
+    // Informa y deja pasar. No interrumpe ni pide escribir nada: queda
+    // anotado en la bitacora y sale en el informe del mes, que es donde un
+    // patron de gasto significa algo. Interrumpir aqui solo enseña al usuario
+    // a teclear cualquier cosa para quitarse el cartel de encima.
+    case 'AVISO':
+      return { permitido: true, mov, veredicto, aviso: true };
+
+    // Un toque, no una redaccion. Protege del cero de mas al teclear.
+    case 'CONFIRMAR':
+      if (confirmado) return { permitido: true, mov, veredicto };
+      return { permitido: false, mov, veredicto, requiere: 'confirmacion' };
 
     case 'FORCE':
       // Un FORCE no se aplica en silencio. Mover el gasto a Recompensas sin
@@ -6000,6 +5999,7 @@ function generarInforme(periodo, movimientos, eventos, carry, extra = {}) {
   const rechazos = eventos.filter((e) => e.tipo === 'REGLA_RECHAZO');
   const forzados = eventos.filter((e) => e.tipo === 'REGLA_FORZADO');
   const excepciones = eventos.filter((e) => e.tipo === 'REGLA_ANULADA');
+  const avisos = eventos.filter((e) => e.tipo === 'REGLA_AVISO');
 
   const gastos = movimientos.filter((m) => m.tipo === 'gasto');
   const ingresos = movimientos.filter((m) => m.tipo === 'ingreso');
@@ -6024,7 +6024,8 @@ function generarInforme(periodo, movimientos, eventos, carry, extra = {}) {
       rechazos: rechazos.length,
       forzados: forzados.length,
       excepciones: excepciones.length,
-      porRegla: contarPorRegla([...rechazos, ...forzados, ...excepciones]),
+      avisos: avisos.length,
+      porRegla: contarPorRegla([...rechazos, ...forzados, ...excepciones, ...avisos]),
     },
     sobranteCents: extra.sobrante?.sobranteCents ?? 0,
     sobranteDesglose: extra.sobrante?.desglose ?? null,
@@ -6581,11 +6582,14 @@ const REGLAS_NUCLEO = [
     prioridad: 6,
     nucleo: true,
     anulable: true,
-    accion: 'DENY',
+    // CONFIRMAR, no DENY: basta un toque. Aqui no se escribe nada, solo se
+    // dice si el numero es el que querias. Es una red contra el dedo gordo,
+    // no una justificacion.
+    accion: 'CONFIRMAR',
     cuando: { op: 'or', args: [op('importeNoPositivo'), op('importeAtipico', 100)] },
-    mensaje: 'Ese importe no cuadra.',
+    mensaje: '¿Ese importe es correcto?',
     porque:
-      'Es cien veces mayor que tu gasto habitual, o no es un número positivo. Suele ser un error de tecleo; si es correcto, confírmalo.',
+      'Es cien veces mayor que tu gasto habitual. Casi siempre es un cero de más al teclear; si de verdad era eso, sigue adelante.',
   },
   {
     id: 'R-01',
@@ -6782,22 +6786,23 @@ const REGLAS_NUCLEO = [
     prioridad: 80,
     nucleo: true,
     anulable: true,
-    accion: 'WARN',
+    // AVISO: no interrumpe ni pide escribir. Mover medio techo a la Cachinha
+    // de una vez es lo normal, no algo que haya que justificar. Queda anotado
+    // y aparece en el informe del mes, que es donde sirve de algo.
+    accion: 'AVISO',
     cuando: y(op('tipoEs', 'gasto'), op('fraccionDelTechoMayorQue', 0.25)),
-    mensaje: 'Es más de un cuarto del techo de golpe.',
-    porque:
-      'No lo bloqueo, pero quiero que lo confirmes y dejes escrito qué fue. Aparecerá señalado en el informe del mes.',
+    mensaje: 'Más de un cuarto del techo de una vez.',
+    porque: 'Queda anotado y saldrá en el informe del mes.',
   },
   {
     id: 'R-15',
     prioridad: 85,
     nucleo: true,
     anulable: true,
-    accion: 'WARN',
+    accion: 'AVISO',
     cuando: y(op('bucketEs', RECOMPENSAS), op('tipoEs', 'gasto'), op('conteoRecienteAlMenos', RECOMPENSAS, 24, 3)),
     mensaje: 'Tercer capricho en 24 horas.',
-    porque:
-      'No es un aviso sobre el importe, es sobre el patrón. Sigue adelante si estás conforme; solo quería que lo vieras escrito.',
+    porque: 'No es por el importe, es por el patrón. Solo para que lo veas.',
   },
 ];
 

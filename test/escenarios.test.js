@@ -459,3 +459,78 @@ test('la instantánea trae todo lo que la interfaz necesita', async () => {
   assert.equal(s.sobrantePendiente, null);
   assert.equal(s.fecha, '2026-09-10');
 });
+
+// =========================================================================
+// Invariante de producto: solo se escribe texto en Esenciales, o al pulsar «Otro»
+// =========================================================================
+
+test('NUNCA se pide escribir nada en Reserva, Inversión ni Recompensas', async () => {
+  const { comandos, reloj } = await montar('2026-09-02T09:00:00Z', { ingresoNormal: u(1_000) });
+
+  // Casos que antes obligaban a redactar: importe enorme respecto al techo,
+  // racha de caprichos, importe atipico. Ninguno debe pedir texto.
+  const intentos = [
+    { bucket: RESERVA, importeCents: u(140) },
+    { bucket: RESERVA, importeCents: u(149) },
+    { bucket: INVERSION, importeCents: u(200), destinoId: 'cachinha' },
+    { bucket: INVERSION, importeCents: u(240), destinoId: 'cachinha' },
+    { bucket: RECOMPENSAS, importeCents: u(90), destinoId: 'plan-hotel' },
+    { bucket: RECOMPENSAS, importeCents: u(5), destinoId: 'plan-hotel' },
+    { bucket: RECOMPENSAS, importeCents: u(5), destinoId: 'plan-hotel' },
+    { bucket: RECOMPENSAS, importeCents: u(5), destinoId: 'plan-hotel' },
+  ];
+
+  for (const [i, cmd] of intentos.entries()) {
+    reloj.avanzarHoras(1);
+    const r = await comandos.registrarGasto(cmd);
+    assert.notEqual(r.requiere, 'justificacion', `intento ${i} (${cmd.bucket}) pidió justificación`);
+    assert.notEqual(r.requiere, 'evidencia', `intento ${i} (${cmd.bucket}) pidió evidencia`);
+    assert.notEqual(r.faltaDestino, 'FALTA_ESPECIFICAR', `intento ${i} pidió especificar sin haber pulsado «Otro»`);
+    assert.equal(r.ok, true, `intento ${i} (${cmd.bucket}) quedó bloqueado: ${r.veredicto?.ruleId}`);
+  }
+});
+
+test('el único texto obligatorio llega al pulsar «Otro»', async () => {
+  const { comandos } = await montar('2026-09-10T09:00:00Z', { ingresoNormal: u(1_000) });
+
+  const sinTexto = await comandos.registrarGasto({
+    bucket: RECOMPENSAS, importeCents: u(20), destinoId: 'otro-recompensa',
+  });
+  assert.equal(sinTexto.faltaDestino, 'FALTA_ESPECIFICAR', 'solo aquí se escribe');
+  assert.equal(sinTexto.etiqueta, 'Especifica');
+
+  const conTexto = await comandos.registrarGasto({
+    bucket: RECOMPENSAS, importeCents: u(20), destinoId: 'otro-recompensa', destinoTexto: 'Concierto',
+  });
+  assert.equal(conTexto.ok, true);
+});
+
+test('un importe absurdo se confirma con un toque, sin redactar', async () => {
+  const { comandos, reloj } = await montar('2026-09-02T09:00:00Z', { ingresoNormal: u(1_000) });
+
+  // Historial normal, para que exista mediana
+  for (const n of [30, 25, 40, 35, 28]) {
+    reloj.avanzarDias(1);
+    await comandos.registrarGasto({ bucket: ESENCIALES, categoryId: 'mercado', importeCents: u(n) });
+  }
+
+  const gordo = await comandos.registrarGasto({ bucket: ESENCIALES, categoryId: 'mercado', importeCents: u(9_000) });
+  assert.equal(gordo.ok, false);
+  assert.equal(gordo.veredicto.ruleId, 'R-17');
+  assert.equal(gordo.requiere, 'confirmacion', 'un sí o un no, no un texto');
+
+  const confirmado = await comandos.registrarGasto({
+    bucket: ESENCIALES, categoryId: 'mercado', importeCents: u(9_000), confirmado: true,
+  });
+  assert.equal(confirmado.ok, true);
+});
+
+test('el aviso de R-14 se registra pero deja pasar', async () => {
+  const { comandos } = await montar('2026-09-10T09:00:00Z', { ingresoNormal: u(1_000) });
+
+  // Techo de Esenciales 500; mas de 125 dispara R-14
+  const r = await comandos.registrarGasto({ bucket: ESENCIALES, categoryId: 'vivienda', importeCents: u(300) });
+  assert.equal(r.ok, true, 'el alquiler es mas de un cuarto del techo y eso es lo normal');
+  assert.equal(r.aviso?.ruleId, 'R-14');
+  assert.equal((await comandos.periodoActual()).totales[ESENCIALES], u(300));
+});
