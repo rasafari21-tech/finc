@@ -40,7 +40,7 @@ El aviso de arriba en `prueba.html` dice en cada momento qué está activo.
 ## Comandos
 
 ```
-npm test              # 176 pruebas del motor financiero
+npm test              # 199 pruebas del motor financiero
 npm run servir        # python -m http.server 8000
 npm run empaquetar    # regenera prueba.html desde el código real
 python tools/iconos.py  # regenera los iconos desde iconos/portada.jpg
@@ -198,6 +198,31 @@ así que no son dinero libre—. La cifra se congela y se guarda en el historial
 Si después la inviertes, el historial **no cambia**: septiembre sobraron R$60
 aunque acabaran en la Cartera. La víspera del cierre la app avisa de cuánto va
 a quedar.
+
+---
+
+## Corregir, revisar, recuperar
+
+**Corregir un error.** Toca cualquier movimiento —en el historial o en el detalle
+de un techo— y puedes cambiar el importe o anularlo. El techo se recalcula solo.
+En un mes ya cerrado no: el archivo es inmutable, así que la app ofrece anotar la
+corrección en el mes en curso.
+
+**Historial.** El icono ☰ abre todos los movimientos del mes, agrupados por día,
+con filtro por techo y búsqueda sobre notas y destinos. El selector de mes llega
+a todo el histórico.
+
+**Copias.** Ajustes → *Exportar una copia* y *Restaurar una copia*. Antes de
+restaurar, la app enseña qué trae el archivo y qué se pierde. No hay
+sincronización: esto es la única red de seguridad, y ahora funciona en los dos
+sentidos.
+
+**Nota y fecha.** El botón ✎ junto al importe abre nota libre y fecha, acotada al
+mes abierto. Opcionales: quien registra y sigue no los ve nunca.
+
+**La explicación.** Tras el alta salen tres tarjetas que cuentan qué son los
+techos, por qué la app a veces dice que no, y qué pasa el día 1. Se pueden volver
+a ver desde Ajustes.
 
 ---
 

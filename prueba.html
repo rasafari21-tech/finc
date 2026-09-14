@@ -23,7 +23,7 @@
   --sup-3: #dfe2eb;
   --tinta: #161a26;
   --tinta-2: #4a5164;
-  --tinta-3: #767d92;
+  --tinta-3: #5f677d;   /* 4,6:1 sobre el papel; #767d92 se quedaba en 3,7 */
   --linea: #d2d7e2;
   --acento: #2e3f86;
   --acento-suave: #dee3f6;
@@ -83,10 +83,12 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 }
 .cabecera .periodo { font-weight: 600; font-size: 15px; }
 .cabecera .sub { font-size: 12px; color: var(--tinta-3); }
-.cabecera .iconos { display: flex; gap: 4px; }
+.cabecera .iconos { display: flex; gap: 2px; margin-right: -6px; }
 .icono {
-  width: 36px; height: 36px; display: grid; place-items: center;
-  border-radius: 9px; font-size: 17px; color: var(--tinta-2);
+  /* 44 px es el minimo tactil de iOS. El glifo sigue a 17 px: lo que crece
+     es la zona que responde al dedo, no el dibujo. */
+  width: 44px; height: 44px; display: grid; place-items: center;
+  border-radius: 10px; font-size: 17px; color: var(--tinta-2);
 }
 .icono:active { background: var(--sup-2); }
 .icono.alerta { color: var(--mal); }
@@ -125,6 +127,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 .aviso.rojo { background: var(--mal-suave); border-left-color: var(--mal); }
 .aviso.ambar { background: var(--avisa-suave); border-left-color: var(--avisa); }
 .aviso.verde { background: var(--ok-suave); border-left-color: var(--ok); }
+.hoja .aviso.rojo strong, .hoja .aviso strong { display: block; margin-bottom: 3px; }
 .aviso .acciones { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .aviso button {
   padding: 6px 12px; border-radius: 7px; font-size: 13px; font-weight: 600;
@@ -193,16 +196,30 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   background: var(--sup-2); border-radius: 9px; margin-bottom: 7px;
 }
 .conmutador button {
-  flex: 1; padding: 6px; border-radius: 7px; font-size: 13.5px; font-weight: 600;
+  flex: 1; min-height: 44px; border-radius: 7px; font-size: 13.5px; font-weight: 600;
   color: var(--tinta-3);
 }
 .conmutador button[aria-pressed='true'] { background: var(--sup); color: var(--tinta); }
 
 .visor {
-  text-align: right;
   padding: 2px 8px 8px;
   min-height: 52px;
-  display: flex; flex-direction: column; justify-content: flex-end;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
+}
+.visor .cifra-visor { text-align: right; flex: 1; min-width: 0; }
+/* Acceso a nota y fecha. Fuera del camino rapido: quien registra y sigue no lo
+   toca nunca, y quien quiera explicar algo lo tiene a un dedo. */
+.visor .detalles {
+  position: relative; flex: none;
+  width: 44px; height: 44px; border-radius: 11px;
+  background: var(--sup-2); color: var(--tinta-3);
+  font-size: 15px; font-weight: 600;
+  display: grid; place-items: center;
+}
+.visor .detalles.puesto { background: var(--acento-suave); color: var(--acento); }
+.visor .detalles .punto {
+  position: absolute; top: 7px; right: 7px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--acento);
 }
 .visor .importe {
   font-size: 38px; font-weight: 700; letter-spacing: -.02em; line-height: 1;
@@ -219,6 +236,16 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   border: 2px solid transparent;
 }
 .ficha[aria-pressed='true'] { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); }
+
+/* Sustituye a la vibracion, que Safari en iOS no implementa: un destello
+   corto al marcar o al guardar. Es el mismo acuse de recibo por otro canal. */
+@keyframes destello {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 var(--acento); }
+  40%  { transform: scale(.965); box-shadow: 0 0 0 4px var(--acento-suave); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 transparent; }
+}
+.destello { animation: destello 260ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .destello { animation: none; } }
 .ficha .restante { display: block; font-size: 10px; font-weight: 500; color: var(--tinta-3); margin-top: 2px; }
 .ficha[aria-pressed='true'] .restante { color: var(--acento); }
 
@@ -305,6 +332,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   padding: 11px 13px; background: var(--paper); align-items: baseline;
 }
 .fila .t { font-size: 14.5px; }
+/* Filas que se pueden tocar para abrir el movimiento (UX-01). */
+button.fila.tocable {
+  width: 100%; text-align: left; font: inherit;
+  min-height: 48px; align-content: center;
+}
+button.fila.tocable:active { background: var(--sup-2); }
+button.fila.tocable .t::after { content: ' ›'; color: var(--tinta-3); }
 .fila .s { grid-column: 1; font-size: 12px; color: var(--tinta-3); }
 .fila .v { font-size: 14.5px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .fila .v.neg { color: var(--mal); }
@@ -321,6 +355,36 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 .campo textarea { min-height: 78px; resize: vertical; }
 .campo .ayuda { font-size: 11.5px; color: var(--tinta-3); margin-top: 4px; }
 .campo.error input, .campo.error textarea { border-color: var(--mal); }
+
+/* Progreso de la introduccion. */
+.puntos-intro { display: flex; gap: 7px; justify-content: center; margin: 20px 0 0; }
+.puntos-intro span {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--sup-3);
+}
+.puntos-intro span.activo { background: var(--acento); }
+
+.filtros { display: flex; gap: 8px; margin-bottom: 12px; }
+.filtros select, .filtros input {
+  flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--linea); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 16px; user-select: text;
+}
+.filtros select { flex: 0 1 auto; }
+
+.dia { margin-bottom: 16px; }
+.dia-cab {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; padding: 0 2px 5px;
+}
+.dia-nom {
+  font-size: 12.5px; font-weight: 600; color: var(--tinta-2);
+  text-transform: capitalize;
+}
+.dia-tot {
+  font-size: 12.5px; color: var(--tinta-3);
+  font-variant-numeric: tabular-nums; display: flex; gap: 8px;
+}
+.dia-tot .pos { color: var(--ok); }
 
 .etiquetas { display: flex; flex-wrap: wrap; gap: 6px; }
 .etiquetas button {
@@ -461,7 +525,8 @@ const { previoDeSeleccion, limpiarSeleccion } = __req('src/dominio/informales.js
 const { cabecera, panelTechos, teclado, fichasBucket, fichasIngreso,
   visor, avisoDiagnostico, avisoSobrante, esc, } = __req('src/ui/componentes.js');
 const { hojaRechazo, hojaDetalleTecho, hojaInforme, hojaDiagnostico, hojaCategorias,
-  hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaSobrante, } = __req('src/ui/hojas.js');
+  hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaSobrante,
+  hojaMovimiento, hojaImportar, hojaDetalles, hojaHistorial, hojaIntro, } = __req('src/ui/hojas.js');
 
 const raiz = document.getElementById('app');
 const capaHojas = document.getElementById('hojas');
@@ -516,9 +581,17 @@ async function arrancar() {
 }
 
 async function refrescar() {
-  await comandos.asegurarPeriodos();
+  const cierres = await comandos.asegurarPeriodos();
   const instantanea = await comandos.instantanea();
   estado.set(instantanea);
+
+  // La compactacion va DESPUES del cierre y sin bloquear el render: el cierre
+  // tiene que terminar en milisegundos, comprimir dos años de historia no.
+  if (cierres.length) {
+    setTimeout(() => {
+      comandos.compactarMesesFrios().catch((e) => console.warn('compactación:', e?.message));
+    }, 2_000);
+  }
 }
 
 // =========================================================================
@@ -587,7 +660,8 @@ function render(s) {
         <button data-accion="modo" data-modo="ingreso" aria-pressed="${esIngreso}">Ingreso</button>
       </div>
 
-      ${visor(formatearEntrada(s.captura.digitos), pistaDeCaptura(s), s.captura.modo)}
+      ${visor(formatearEntrada(s.captura.digitos), pistaDeCaptura(s), s.captura.modo,
+              s.ajustes?.moneda, !esIngreso, s.captura)}
 
       ${esIngreso
         ? fichasIngreso(limpiarSeleccion(s.captura.bucketsIngreso), previoIngreso(s, centavos))
@@ -601,6 +675,7 @@ function render(s) {
     </div>`;
 
   capaHojas.innerHTML = s.hoja ? renderHoja(s) : '';
+  sincronizarFoco(s.hoja?.tipo ?? null);
   capaBrindis.innerHTML = s.brindis
     ? `<div class="brindis"><span>${esc(s.brindis.texto)}</span>
          ${s.brindis.movimientoId
@@ -623,6 +698,20 @@ function renderHoja(s) {
         captura: s.captura,
         importeTexto: s.captura.digitos ? `${s.ajustes?.moneda ?? 'R$'}${formatearEntrada(s.captura.digitos)}` : '',
       });
+    case 'intro':
+      return hojaIntro({
+        paso: h.paso ?? 0,
+        ingresoNormal: s.ajustes?.ingresoNormal?.montoCents ?? 0,
+        pesos: s.ajustes?.pesos,
+      });
+    case 'historial':
+      return hojaHistorial({ datos: h.datos, meses: h.meses, ajustes: s.ajustes });
+    case 'movimiento':
+      return hojaMovimiento({ ...h, ajustes: s.ajustes });
+    case 'importar':
+      return hojaImportar({ analisis: h.analisis, error: h.error });
+    case 'detalles':
+      return hojaDetalles({ captura: s.captura, periodo: s.periodo, fechaHoy: s.fecha });
     case 'sobrante':
       return hojaSobrante({
         pendiente: s.sobrantePendiente,
@@ -634,7 +723,11 @@ function renderHoja(s) {
     case 'detalle':
       return hojaDetalleTecho({ periodo: s.periodo, bucket: h.bucket, movimientos: s.ultimos, fecha: s.fecha });
     case 'informe':
-      return hojaInforme({ informe: h.informe ?? s.ultimoInforme, periodId: s.periodo.id });
+      return hojaInforme({
+        informe: h.informe ?? s.ultimoInforme,
+        periodId: s.periodo.id,
+        disponibles: h.disponibles ?? [],
+      });
     case 'diagnostico':
       return hojaDiagnostico({ dx: s.diagnostico });
     case 'categorias':
@@ -648,12 +741,50 @@ function renderHoja(s) {
   }
 }
 
+/**
+ * Foco de las hojas.
+ *
+ * Al abrir una hoja el foco tiene que entrar en ella, y al cerrarla volver a
+ * donde estaba. Sin esto, quien navegue con teclado o VoiceOver abre una hoja
+ * y sigue con el foco detras, tabulando por una pantalla que ya no ve.
+ *
+ * El enfoque ocurre solo cuando CAMBIA la hoja, no en cada repintado: la hoja
+ * se vuelve a dibujar con cada cambio de estado, y robar el foco cada vez
+ * expulsaria al usuario del campo que esta escribiendo.
+ */
+let focoPrevio = null;
+let tipoHojaVisible = null;
+
 function abrirHoja(hoja) {
+  if (!estado.get().hoja) focoPrevio = document.activeElement;
   estado.set({ hoja });
 }
 
 function cerrarHoja() {
+  correccionPendiente = null;
   estado.set({ hoja: null });
+  if (focoPrevio?.isConnected) focoPrevio.focus();
+  focoPrevio = null;
+}
+
+const ENFOCABLES = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+function enfocables() {
+  const hoja = capaHojas.querySelector('.hoja');
+  return hoja ? [...hoja.querySelectorAll(ENFOCABLES)].filter((e) => !e.disabled) : [];
+}
+
+function sincronizarFoco(tipo) {
+  if (tipo === tipoHojaVisible) return;
+  tipoHojaVisible = tipo;
+  if (!tipo) return;
+
+  const hoja = capaHojas.querySelector('.hoja');
+  if (!hoja) return;
+  // Si la hoja pide escribir algo, el foco va al campo; si no, al contenedor,
+  // que es lo que hace que el lector de pantalla lea el titulo.
+  const campo = hoja.querySelector('input, textarea, select');
+  (campo ?? hoja).focus({ preventScroll: true });
 }
 
 function brindar(texto, movimientoId = null) {
@@ -704,7 +835,7 @@ const acciones = {
     const siguiente = actual.includes(b) ? actual.filter((x) => x !== b) : [...actual, b];
     if (!siguiente.length) return; // desmarcar el ultimo no hace nada
     estado.set({ captura: { ...s.captura, bucketsIngreso: siguiente } });
-    vibrar(8);
+    destellarPulsado(el);
   },
 
   /**
@@ -720,14 +851,12 @@ const acciones = {
       estado.set({
         captura: { ...s.captura, bucket, destinoId: automatico.id, destinoTexto: null, categoryId: null },
       });
-      vibrar(8);
       return;
     }
 
     if (lista.length > 0) {
       estado.set({ captura: { ...s.captura, bucket, destinoId: null, destinoTexto: null, categoryId: null } });
       abrirHoja({ tipo: 'destinos', bucket });
-      vibrar(8);
       return;
     }
 
@@ -737,7 +866,6 @@ const acciones = {
       return;
     }
     estado.set({ captura: { ...s.captura, bucket, categoryId: categoriaPorDefecto(bucket) } });
-    vibrar(8);
   },
 
   'elegir-destino'(el, s) {
@@ -787,6 +915,16 @@ const acciones = {
   },
 
   async 'confirmar-importe'(_el, s) {
+    if (correccionPendiente) {
+      const { id, importeCents } = correccionPendiente;
+      correccionPendiente = null;
+      const r = await comandos.editarMovimiento(id, { importeCents, confirmado: true });
+      cerrarHoja();
+      if (!r.ok) { brindar('No se pudo corregir.'); return; }
+      await refrescar();
+      brindar(`Corregido a ${formatear(importeCents)}.`);
+      return;
+    }
     await guardar({ ...s.captura, confirmado: true });
   },
 
@@ -812,6 +950,123 @@ const acciones = {
     estado.set({ captura: { ...s.captura, [campo]: !s.captura[campo], nota: leerNota() } });
   },
 
+  // --- detalles opcionales del registro (UX-04, UX-05) -----------------
+
+  'ver-detalles'() {
+    abrirHoja({ tipo: 'detalles' });
+  },
+
+  'guardar-detalles'(_el, s) {
+    const nota = capaHojas.querySelector('[data-campo="nota"]')?.value ?? '';
+    const fecha = capaHojas.querySelector('[data-campo="fecha"]')?.value || null;
+    estado.set({ captura: { ...s.captura, nota: nota.trim(), localDate: fecha } });
+    cerrarHoja();
+  },
+
+  'limpiar-detalles'(_el, s) {
+    estado.set({ captura: { ...s.captura, nota: '', localDate: null } });
+    cerrarHoja();
+  },
+
+  // --- corregir un movimiento (UX-01) -----------------------------------
+
+  async 'ver-movimiento'(el) {
+    const encontrado = await comandos.movimiento(el.dataset.id);
+    if (!encontrado) return;
+    abrirHoja({ tipo: 'movimiento', ...encontrado });
+  },
+
+  async 'guardar-correccion'(el, s) {
+    const texto = capaHojas.querySelector('[data-campo="nuevoImporte"]')?.value ?? '';
+    const centavos = parsearCentavos(texto);
+    if (!(centavos > 0)) {
+      capaHojas.querySelector('.campo')?.classList.add('error');
+      return;
+    }
+    const r = await comandos.editarMovimiento(el.dataset.id, { importeCents: centavos });
+    if (!r.ok) {
+      if (r.veredicto) {
+        // Si la correccion trae otro importe raro, se pregunta igual que en un
+        // registro nuevo, y al confirmar se retoma por donde iba.
+        correccionPendiente = { id: el.dataset.id, importeCents: centavos };
+        abrirHoja({ tipo: 'rechazo', veredicto: r.veredicto, requiere: r.requiere });
+      } else {
+        brindar('No se pudo corregir.');
+      }
+      return;
+    }
+    correccionPendiente = null;
+    cerrarHoja();
+    await refrescar();
+    brindar(`Corregido a ${formatear(centavos)}.`);
+  },
+
+  async 'anular-movimiento'(el) {
+    const r = await comandos.anularMovimiento(el.dataset.id);
+    cerrarHoja();
+    if (!r.ok) { brindar('No se pudo anular.'); return; }
+    await refrescar();
+    brindar('Movimiento anulado.');
+  },
+
+  async 'corregir-en-abierto'(el, s) {
+    const encontrado = await comandos.movimiento(el.dataset.id);
+    cerrarHoja();
+    if (!encontrado) return;
+    const m = encontrado.movimiento;
+    estado.set({
+      captura: {
+        ...capturaVacia(),
+        modo: m.tipo === 'ingreso' ? 'ingreso' : 'gasto',
+        bucket: m.bucket,
+        categoryId: m.categoryId,
+        destinoId: m.destinoId,
+        destinoTexto: m.destinoTexto,
+        nota: `Corrección de ${m.localDate}`,
+      },
+    });
+    brindar('Teclea el importe de la corrección.');
+  },
+
+  // --- restaurar una copia (UX-03) --------------------------------------
+
+  'ver-importar'() {
+    abrirHoja({ tipo: 'importar' });
+  },
+
+  'elegir-copia'() {
+    const entrada = document.createElement('input');
+    entrada.type = 'file';
+    entrada.accept = 'application/json,.json';
+    entrada.addEventListener('change', async () => {
+      const archivo = entrada.files?.[0];
+      if (!archivo) return;
+      try {
+        const datos = JSON.parse(await archivo.text());
+        const analisis = await comandos.analizarCopia(datos);
+        if (!analisis.valido) {
+          abrirHoja({ tipo: 'importar', error: analisis.motivo });
+          return;
+        }
+        copiaPendiente = datos;
+        abrirHoja({ tipo: 'importar', analisis });
+      } catch (e) {
+        abrirHoja({ tipo: 'importar', error: 'No es un archivo JSON válido.' });
+      }
+    });
+    entrada.click();
+  },
+
+  async 'confirmar-restauracion'() {
+    if (!copiaPendiente) return;
+    const r = await comandos.restaurarCopia(copiaPendiente);
+    copiaPendiente = null;
+    cerrarHoja();
+    if (!r.ok) { brindar(r.motivo ?? 'No se pudo restaurar.'); return; }
+    await refrescar();
+    brindar(`Restaurados ${r.resumen.movimientos} movimientos de ${r.resumen.periodos} meses.`);
+  },
+
   async deshacer(el) {
     const r = await comandos.deshacer(el.dataset.id);
     estado.set({ brindis: null });
@@ -830,9 +1085,8 @@ const acciones = {
       return;
     }
     await comandos.configurarIngresoNormal(centavos);
-    cerrarHoja();
     await refrescar();
-    brindar(`Listo. Cada día 1 entrarán ${formatear(centavos)}.`);
+    abrirHoja({ tipo: 'intro', paso: 0 });
   },
 
   async 'saltar-alta'() {
@@ -841,8 +1095,24 @@ const acciones = {
       ...ajustes,
       ingresoNormal: { ...ajustes.ingresoNormal, configurado: true, montoCents: 0 },
     });
-    cerrarHoja();
     await refrescar();
+    abrirHoja({ tipo: 'intro', paso: 0 });
+  },
+
+  // --- introduccion (UX-10) ---------------------------------------------
+
+  'ver-intro'() {
+    abrirHoja({ tipo: 'intro', paso: 0 });
+  },
+
+  async 'intro-siguiente'(el) {
+    const paso = Number(el.dataset.paso);
+    if (paso >= 3) { cerrarHoja(); await refrescar(); return; }
+    abrirHoja({ tipo: 'intro', paso });
+  },
+
+  'intro-saltar'() {
+    cerrarHoja();
   },
 
   // --- hojas -----------------------------------------------------------
@@ -861,8 +1131,24 @@ const acciones = {
     });
   },
 
+  // --- historial (UX-02) e informes por mes (UX-12) ---------------------
+
+  async 'ver-historial'(_el, s) {
+    await mostrarHistorial({ periodId: s.periodo.id });
+  },
+
+  async 'filtrar-techo'(el, s) {
+    const f = s.hoja?.datos?.filtro ?? {};
+    await mostrarHistorial({
+      periodId: s.hoja.datos.periodId,
+      bucket: el.dataset.bucket || null,
+      texto: capaHojas.querySelector('[data-campo="buscaHistorial"]')?.value ?? f.texto ?? '',
+    });
+  },
+
   async 'ver-informe'(_el, s) {
-    abrirHoja({ tipo: 'informe', informe: s.ultimoInforme });
+    const disponibles = (await repo.informes()).map((i) => i.periodId);
+    abrirHoja({ tipo: 'informe', informe: s.ultimoInforme, disponibles });
   },
 
   async 'ver-sobrante'() {
@@ -997,12 +1283,38 @@ function leerNota() {
   return capaHojas.querySelector('[data-campo="nota"]')?.value ?? estado.get().captura.nota;
 }
 
-function vibrar(ms) {
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    /* no todos los dispositivos lo tienen */
-  }
+/** Abre o refresca el historial conservando el filtro. */
+async function mostrarHistorial(filtro) {
+  const datos = await comandos.historial(filtro);
+  const meses = await comandos.mesesDisponibles();
+  abrirHoja({ tipo: 'historial', datos, meses });
+}
+
+/** Copia a la espera de confirmacion en la hoja de restaurar. */
+let copiaPendiente = null;
+
+/** Correccion frenada por una regla, a la espera de que se confirme. */
+let correccionPendiente = null;
+
+/**
+ * Acuse de recibo visual.
+ *
+ * Aqui habia nueve llamadas a navigator.vibrate(). Safari en iOS no implementa
+ * esa API: no vibraba nada y nunca lo hizo. La confirmacion al tocar si aporta;
+ * lo que fallaba era el canal. Un destello corto sobre el propio elemento
+ * llega siempre y respeta prefers-reduced-motion desde el CSS.
+ */
+function destellar(el) {
+  if (!el) return;
+  el.classList.remove('destello');
+  void el.offsetWidth; // fuerza reinicio de la animacion si se repite rapido
+  el.classList.add('destello');
+  setTimeout(() => el.classList.remove('destello'), 320);
+}
+
+/** Destella el boton que se acaba de pulsar, sea cual sea. */
+function destellarPulsado(el) {
+  destellar(el);
 }
 
 /** Camino unico de guardado de gastos. */
@@ -1033,6 +1345,7 @@ async function guardar(captura) {
     comercioTipo: captura.comercioTipo,
     aceptaForzado: captura.forzado,
     confirmado: captura.confirmado,
+    localDate: captura.localDate ?? undefined,
   };
 
   const r = await comandos.registrarGasto(cmd);
@@ -1046,11 +1359,8 @@ async function guardar(captura) {
   if (!r.ok) {
     estado.set({ captura: { ...captura, nota, razonReserva: razon } });
     abrirHoja({ tipo: 'rechazo', veredicto: r.veredicto, sugerencia: r.sugerencia, requiere: r.requiere });
-    vibrar([12, 60, 12]);
     return;
   }
-
-  vibrar(14);
   estado.set({ captura: capturaVacia(), hoja: null });
   await refrescar();
 
@@ -1072,8 +1382,6 @@ async function guardarIngreso(centavos, buckets) {
     brindar(r.veredicto?.mensaje ?? 'No se pudo registrar.');
     return;
   }
-
-  vibrar(14);
   estado.set({
     captura: { ...capturaVacia(), modo: 'ingreso', bucketsIngreso: limpiarSeleccion(buckets) },
     hoja: null,
@@ -1121,7 +1429,6 @@ document.addEventListener('pointerdown', (evento) => {
     const bucket = ficha.dataset.bucket;
     estado.set({ captura: { ...s.captura, bucket } });
     abrirHoja({ tipo: destinosDe(s.ajustes, bucket).length ? 'destinos' : 'categorias', bucket });
-    vibrar(18);
   }, 480);
 });
 document.addEventListener('pointerup', () => clearTimeout(temporizadorLargo));
@@ -1142,6 +1449,63 @@ document.addEventListener('keydown', (evento) => {
   } else if (evento.key === 'Escape') {
     cerrarHoja();
   }
+});
+
+// Trampa de tabulador: con una hoja abierta, el foco no se va por detras.
+document.addEventListener('keydown', (evento) => {
+  if (evento.key !== 'Tab' || !estado.get().hoja) return;
+  const lista = enfocables();
+  if (!lista.length) return;
+
+  const primero = lista[0];
+  const ultimo = lista[lista.length - 1];
+  const dentro = capaHojas.contains(document.activeElement);
+
+  if (!dentro) {
+    evento.preventDefault();
+    (evento.shiftKey ? ultimo : primero).focus();
+  } else if (evento.shiftKey && document.activeElement === primero) {
+    evento.preventDefault();
+    ultimo.focus();
+  } else if (!evento.shiftKey && document.activeElement === ultimo) {
+    evento.preventDefault();
+    primero.focus();
+  }
+});
+
+// Los selectores y el buscador de las hojas viven fuera de la delegacion por
+// click: escuchan cambios y entrada de texto sobre la capa de hojas.
+capaHojas.addEventListener('change', async (evento) => {
+  const campo = evento.target.dataset?.campo;
+  if (campo === 'mesHistorial') {
+    const s = estado.get();
+    await mostrarHistorial({
+      periodId: evento.target.value,
+      bucket: s.hoja?.datos?.filtro?.bucket ?? null,
+      texto: capaHojas.querySelector('[data-campo="buscaHistorial"]')?.value ?? '',
+    });
+  } else if (campo === 'mesInforme') {
+    const informe = await repo.informe(evento.target.value);
+    const disponibles = (await repo.informes()).map((i) => i.periodId);
+    abrirHoja({ tipo: 'informe', informe, disponibles });
+  }
+});
+
+let tecleoHistorial = null;
+capaHojas.addEventListener('input', (evento) => {
+  if (evento.target.dataset?.campo !== 'buscaHistorial') return;
+  clearTimeout(tecleoHistorial);
+  const texto = evento.target.value;
+  // Se espera a que pare de teclear: repintar en cada letra pierde el foco.
+  tecleoHistorial = setTimeout(async () => {
+    const s = estado.get();
+    await mostrarHistorial({
+      periodId: s.hoja?.datos?.periodId,
+      bucket: s.hoja?.datos?.filtro?.bucket ?? null,
+      texto,
+    });
+    capaHojas.querySelector('[data-campo="buscaHistorial"]')?.focus();
+  }, 320);
 });
 
 estado.suscribir(render);
@@ -2408,6 +2772,17 @@ function crearRepo(motor, boveda) {
       return a.informe ?? null;
     },
 
+    /** El registro completo de archives, no solo su informe. */
+    async archivo(periodId) {
+      const crudo = await motor.obtener('archives', periodId);
+      return crudo ? abrir('archives', crudo) : null;
+    },
+
+    async guardarArchivo(registro) {
+      await motor.guardar('archives', await sellar('archives', registro));
+      return registro;
+    },
+
     async informes() {
       const crudos = await motor.todos('archives');
       const abiertos = await abrirVarios('archives', crudos);
@@ -2589,6 +2964,28 @@ const { validarDestino, destinoAutomatico, categoriaDe, destinosDe, } = __req('s
 // destinoAutomatico se usa para rellenar el destino unico de Reserva.
 const { crearSobrante, resolverSobrante: resolverRegistro, sobranteProyectado,
   esVisperaDeCierre, DESTINOS_SOBRANTE, mediaSobrante, } = __req('src/dominio/sobrante.js');
+
+/**
+ * Comprime y descomprime con la API del navegador, sin dependencias.
+ * En Node (los tests) CompressionStream tambien existe desde la v18.
+ */
+async function comprimir(texto) {
+  if (typeof CompressionStream === 'undefined') return texto; // sin soporte: se guarda tal cual
+  const flujo = new Blob([texto]).stream().pipeThrough(new CompressionStream('gzip'));
+  const bytes = new Uint8Array(await new Response(flujo).arrayBuffer());
+  let binario = '';
+  for (const b of bytes) binario += String.fromCharCode(b);
+  return `gz:${btoa(binario)}`;
+}
+
+async function descomprimir(dato) {
+  if (typeof dato !== 'string' || !dato.startsWith('gz:')) return dato;
+  const binario = atob(dato.slice(3));
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(flujo).text();
+}
 
 function crearComandos(repo, reloj) {
   /** Cierre en vuelo, para que varios disparadores simultaneos no dupliquen trabajo. */
@@ -2979,6 +3376,214 @@ function crearComandos(repo, reloj) {
       return { ok: true, movimiento: mov, reparto: reparto.partes, detalleReparto: reparto, periodo: actualizado };
     },
 
+    // --- corregir lo ya registrado --------------------------------------
+
+    /** Un movimiento con lo que la interfaz necesita para enseñarlo y juzgarlo. */
+    async movimiento(id) {
+      const abierto = await comandos.periodoActual();
+      const cerrados = (await repo.periodosCerrados()).map((p) => p.id);
+
+      for (const periodId of [abierto.id, ...cerrados]) {
+        const movs = await repo.movimientos({ periodId });
+        const m = movs.find((x) => x.id === id);
+        if (m) return { movimiento: m, editable: periodId === abierto.id, periodId };
+      }
+      return null;
+    },
+
+    /**
+     * Anula un movimiento del mes abierto.
+     *
+     * El ledger es inmutable a proposito, pero eso no puede significar que un
+     * cero de mas quede grabado para siempre. Dentro del mes abierto se borra
+     * de verdad y se recalcula el periodo desde sus movimientos, que es
+     * exactamente lo que ya hacia deshacer. En un mes cerrado no se toca nada:
+     * el archivo es inmutable y ahi si manda R-18.
+     */
+    async anularMovimiento(id) {
+      const encontrado = await comandos.movimiento(id);
+      if (!encontrado) return { ok: false, codigo: 'NO_ENCONTRADO' };
+      if (!encontrado.editable) return { ok: false, codigo: 'MES_CERRADO', periodId: encontrado.periodId };
+
+      const { movimiento: mov, periodId } = encontrado;
+
+      await repo.motor.transaccion(['movements', 'allocations', 'periods', 'auditLog'], async () => {
+        await repo.motor.borrar('movements', mov.id);
+        const asigs = await repo.asignaciones(periodId);
+        for (const a of asigs.filter((x) => x.movementId === mov.id)) {
+          await repo.motor.borrar('allocations', a.id);
+        }
+      });
+
+      await repo.agregarEvento({
+        tipo: 'MOVIMIENTO_ANULADO',
+        periodId,
+        detalle: { id: mov.id, importeCents: mov.importeCents, bucket: mov.bucket },
+      });
+      const periodo = await comandos.recalcularPeriodo(periodId);
+      return { ok: true, periodo };
+    },
+
+    /**
+     * Corrige un movimiento del mes abierto.
+     *
+     * Se anula y se vuelve a registrar con los datos nuevos, para que pase por
+     * las mismas reglas que cualquier otro. Si el nuevo importe choca con una
+     * regla, se devuelve el veredicto y NO se pierde el original: la anulacion
+     * solo se confirma cuando el reemplazo entra.
+     */
+    async editarMovimiento(id, cambios) {
+      const encontrado = await comandos.movimiento(id);
+      if (!encontrado) return { ok: false, codigo: 'NO_ENCONTRADO' };
+      if (!encontrado.editable) return { ok: false, codigo: 'MES_CERRADO', periodId: encontrado.periodId };
+
+      const original = encontrado.movimiento;
+      const anulado = await comandos.anularMovimiento(id);
+      if (!anulado.ok) return anulado;
+
+      const rehacer = {
+        importeCents: cambios.importeCents ?? original.importeCents,
+        bucket: cambios.bucket ?? original.bucket,
+        categoryId: cambios.categoryId ?? original.categoryId,
+        destinoId: cambios.destinoId ?? original.destinoId,
+        destinoTexto: cambios.destinoTexto ?? original.destinoTexto,
+        nota: cambios.nota ?? original.nota,
+        tags: original.tags,
+        razonReserva: original.razonReserva,
+        localDate: cambios.localDate ?? original.localDate,
+        ts: cambios.ts ?? original.ts,
+        // El bucket ya es el que la regla forzo en su dia, asi que un FORCE no
+        // vuelve a saltar. Pero `confirmado` NO se hereda: si la correccion
+        // trae otro cero de mas, R-17 tiene que volver a preguntarlo. Ese es
+        // justo el momento en que mas facil es equivocarse otra vez.
+        aceptaForzado: true,
+        confirmado: cambios.confirmado ?? false,
+        justificacion: original.justificacion,
+      };
+
+      const r = original.tipo === 'ingreso'
+        ? await comandos.registrarIngreso({ ...rehacer, buckets: cambios.buckets })
+        : await comandos.registrarGasto(rehacer);
+
+      if (!r.ok) {
+        // El reemplazo no entro: se repone el original para no perder nada.
+        await repo.escribirMovimiento({ mov: original, periodo: await comandos.periodoActual() });
+        await comandos.recalcularPeriodo(encontrado.periodId);
+        return { ok: false, codigo: 'RECHAZADO', veredicto: r.veredicto, requiere: r.requiere };
+      }
+
+      await repo.agregarEvento({
+        tipo: 'MOVIMIENTO_CORREGIDO',
+        periodId: encontrado.periodId,
+        detalle: { de: original.importeCents, a: rehacer.importeCents, idOriginal: id },
+      });
+      return { ok: true, movimiento: r.movimiento };
+    },
+
+    // --- historial (UX-02) ------------------------------------------------
+
+    /**
+     * Movimientos de un mes, agrupados por dia y filtrables.
+     *
+     * Es la respuesta a «¿en que se me fue el mes?», que hasta ahora no
+     * existia dentro de la app: lo unico consultable eran los diez ultimos de
+     * un techo, enterrados en la hoja de detalle.
+     */
+    async historial({ periodId, bucket = null, texto = '', limite = 120 } = {}) {
+      const mes = periodId ?? (await comandos.periodoActual()).id;
+      const ajustes = await repo.ajustes();
+      const movimientos = await repo.movimientos({ periodId: mes, descendente: true });
+
+      const busca = texto.trim().toLowerCase();
+      const coincide = (m) => {
+        if (bucket && m.bucket !== bucket) return false;
+        if (!busca) return true;
+        const cat = CATEGORIAS[m.categoryId]?.nombre ?? '';
+        const dest = m.destinoTexto ?? destinosDe(ajustes, m.bucket).find((d) => d.id === m.destinoId)?.nombre ?? '';
+        return `${m.nota} ${cat} ${dest}`.toLowerCase().includes(busca);
+      };
+
+      const filtrados = movimientos.filter(coincide).slice(0, limite);
+
+      // Agrupado por dia, que es como se recuerda el gasto.
+      const dias = [];
+      for (const m of filtrados) {
+        const ultimo = dias[dias.length - 1];
+        if (ultimo?.fecha === m.localDate) ultimo.movimientos.push(m);
+        else dias.push({ fecha: m.localDate, movimientos: [m] });
+      }
+      for (const d of dias) {
+        d.gastado = d.movimientos.filter((m) => m.tipo === 'gasto').reduce((a, m) => a + m.importeCents, 0);
+        d.ingresado = d.movimientos.filter((m) => m.tipo === 'ingreso').reduce((a, m) => a + m.importeCents, 0);
+      }
+
+      return {
+        periodId: mes,
+        dias,
+        total: filtrados.length,
+        hayMas: movimientos.filter(coincide).length > filtrados.length,
+        filtro: { bucket, texto },
+      };
+    },
+
+    /** Meses con datos, del mas reciente al mas antiguo, para los selectores. */
+    async mesesDisponibles() {
+      const periodos = await repo.periodos();
+      return periodos.map((p) => p.id).sort().reverse();
+    },
+
+    // --- copias de seguridad ---------------------------------------------
+
+    /**
+     * Mira una copia sin tocar nada y cuenta que trae.
+     *
+     * Restaurar sustituye todo lo que hay, asi que la decision no puede
+     * tomarse a ciegas: esto es lo que se enseña antes de preguntar.
+     */
+    async analizarCopia(datos) {
+      if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
+        return { valido: false, motivo: 'El archivo no tiene la forma de una copia de finc.' };
+      }
+      const imprescindibles = ['periods', 'movements', 'settings'];
+      const faltan = imprescindibles.filter((k) => !Array.isArray(datos[k]));
+      if (faltan.length) {
+        return { valido: false, motivo: `Al archivo le faltan datos (${faltan.join(', ')}).` };
+      }
+
+      const periodos = datos.periods.map((p) => p.id).filter(Boolean).sort();
+      const actual = await repo.estadisticas();
+
+      return {
+        valido: true,
+        entrante: {
+          periodos: periodos.length,
+          primerMes: periodos[0] ?? null,
+          ultimoMes: periodos[periodos.length - 1] ?? null,
+          movimientos: datos.movements.length,
+          sobrantes: (datos.sobrantes ?? []).length,
+          informes: (datos.archives ?? []).length,
+        },
+        actual: { periodos: actual.periodos, movimientos: actual.movimientos },
+      };
+    },
+
+    /** Sustituye el almacen por el de la copia. Irreversible. */
+    async restaurarCopia(datos) {
+      const analisis = await comandos.analizarCopia(datos);
+      if (!analisis.valido) return { ok: false, motivo: analisis.motivo };
+
+      await repo.vaciar();
+      await repo.importar(datos);
+
+      // Los totales se rehacen desde los movimientos: si la copia venia de una
+      // version anterior, el recalculo la deja coherente con el motor de hoy.
+      for (const p of await repo.periodos()) {
+        if (p.status === 'abierto') await comandos.recalcularPeriodo(p.id);
+      }
+      await repo.agregarEvento({ tipo: 'COPIA_RESTAURADA', detalle: analisis.entrante });
+      return { ok: true, resumen: analisis.entrante };
+    },
+
     /** Deshacer: solo dentro de la ventana de gracia (§11.1). */
     async deshacer(movimientoId, ventanaMs = 8000) {
       const periodo = await comandos.periodoActual();
@@ -3058,6 +3663,60 @@ function crearComandos(repo, reloj) {
       });
 
       return { ok: true, registro: actualizado };
+    },
+
+    // --- compactacion de meses frios (UX-15) ------------------------------
+
+    /**
+     * Comprime los periodos de mas de N meses y borra sus filas calientes.
+     *
+     * El historial vive entero en `movements`, que esta bien mientras son
+     * cientos de filas y deja de estarlo cuando son cientos de miles. Aqui el
+     * orden importa: se comprime ANTES de cifrar, porque el texto cifrado es
+     * incompresible por definicion y el gzip no ahorraria nada.
+     *
+     * Se ejecuta en segundo plano tras un cierre, nunca durante: el cierre
+     * tiene que terminar en milisegundos.
+     */
+    async compactarMesesFrios({ mesesCalientes = 24 } = {}) {
+      const cerrados = await repo.periodosCerrados();
+      const frios = cerrados.slice(0, Math.max(0, cerrados.length - mesesCalientes));
+      if (!frios.length) return { compactados: 0, filas: 0 };
+
+      let filas = 0;
+      for (const p of frios) {
+        const movimientos = await repo.movimientos({ periodId: p.id, descendente: false });
+        if (!movimientos.length) continue;
+
+        const archivo = (await repo.informe(p.id)) ?? null;
+        const comprimido = await comprimir(JSON.stringify(movimientos));
+
+        await repo.motor.transaccion(['archives', 'movements', 'allocations'], async () => {
+          await repo.guardarArchivo({
+            periodId: p.id,
+            formatVersion: 1,
+            informe: archivo,
+            movimientosGz: comprimido,
+            archivadoEn: reloj.ahora(),
+          });
+          for (const m of movimientos) await repo.motor.borrar('movements', m.id);
+          for (const a of await repo.asignaciones(p.id)) await repo.motor.borrar('allocations', a.id);
+        });
+        filas += movimientos.length;
+      }
+
+      await repo.agregarEvento({
+        tipo: 'MESES_COMPACTADOS',
+        detalle: { meses: frios.map((p) => p.id), filas },
+      });
+      return { compactados: frios.length, filas };
+    },
+
+    /** Movimientos de un mes ya compactado, descomprimidos al vuelo. */
+    async movimientosArchivados(periodId) {
+      const archivo = await repo.archivo(periodId);
+      if (!archivo?.movimientosGz) return null;
+      return JSON.parse(await descomprimir(archivo.movimientosGz));
     },
 
     // --- diagnostico ------------------------------------------------------
@@ -3951,7 +4610,15 @@ function barraTecho(periodo, bucket, fechaHoy) {
 }
 
 function panelTechos(periodo, fechaHoy) {
-  return `<div class="techos">${ORDEN.map((b) => barraTecho(periodo, b, fechaHoy)).join('')}</div>`;
+  const sinTechos = ORDEN.every((b) => (periodo.techos[b] ?? 0) === 0);
+  return `
+    <div class="techos">${ORDEN.map((b) => barraTecho(periodo, b, fechaHoy)).join('')}</div>
+    ${sinTechos
+      ? `<p class="vacio" style="padding:10px 4px 14px;font-size:13.5px">
+           Los techos están a cero porque este mes no ha entrado dinero todavía.<br>
+           Registra un ingreso, o pon tu ingreso mensual en Ajustes para que entre solo cada día 1.
+         </p>`
+      : ''}`;
 }
 
 /** Teclado numerico propio: aparece al instante y no ofrece caracteres invalidos. */
@@ -4001,26 +4668,43 @@ function fichasIngreso(seleccionadas, reparto) {
 }
 
 /** Visor del importe, con el texto de ayuda contextual debajo. */
-function visor(digitos, pista, modo, moneda = MONEDA) {
+function visor(digitos, pista, modo, moneda = MONEDA, conDetalles = false, captura = null) {
   const texto = digitos === '' ? '0' : digitos;
+  const hayNota = Boolean(captura?.nota?.trim());
+  const otraFecha = Boolean(captura?.localDate);
+  const marcado = hayNota || otraFecha;
+
   return `
     <div class="visor">
-      <span class="importe ${digitos === '' ? 'vacio' : ''}">${modo === 'ingreso' ? '+' : ''}${esc(moneda)}${esc(texto)}</span>
-      <span class="pista-txt">${esc(pista ?? '')}</span>
+      ${conDetalles
+        ? `<button class="detalles ${marcado ? 'puesto' : ''}" data-accion="ver-detalles"
+                   aria-label="Nota y fecha del gasto">
+             ${otraFecha ? esc(captura.localDate.slice(8)) + '/' + esc(captura.localDate.slice(5, 7)) : '✎'}
+             ${hayNota ? '<span class="punto" aria-hidden="true"></span>' : ''}
+           </button>`
+        : ''}
+      <span class="cifra-visor">
+        <span class="importe ${digitos === '' ? 'vacio' : ''}">${modo === 'ingreso' ? '+' : ''}${esc(moneda)}${esc(texto)}</span>
+        <span class="pista-txt">${esc(pista ?? '')}</span>
+      </span>
     </div>`;
 }
 
-function filaMovimiento(mov, categorias) {
+function filaMovimiento(mov, categorias, tocable = false) {
   const cat = categorias?.[mov.categoryId]?.nombre ?? (mov.tipo === 'ingreso' ? 'Ingreso' : 'Sin categoría');
   const signo = mov.tipo === 'ingreso' ? 'pos' : '';
+  const etiqueta = tocable ? 'button' : 'div';
+  const atributos = tocable
+    ? ` data-accion="ver-movimiento" data-id="${esc(mov.id)}" class="fila tocable"`
+    : ' class="fila"';
   return `
-    <div class="fila">
+    <${etiqueta}${atributos}>
       <span class="t">${esc(cat)}</span>
       <span class="v ${signo}">${mov.tipo === 'ingreso' ? '+' : ''}${formatear(mov.importeCents)}</span>
       <span class="s">${esc(mov.localDate)} · ${esc(ETIQUETAS[mov.bucket] ?? (mov.tipo === 'ingreso' ? 'repartido' : '—'))}${
         mov.nota ? ` · ${esc(mov.nota.slice(0, 40))}` : ''
       }</span>
-    </div>`;
+    </${etiqueta}>`;
 }
 
 function cabecera(periodo, estado) {
@@ -4035,6 +4719,7 @@ function cabecera(periodo, estado) {
         <span class="sub">día ${dia} de ${dias}</span>
       </span>
       <span class="iconos">
+        <button class="icono" data-accion="ver-historial" aria-label="Movimientos">☰</button>
         <button class="icono" data-accion="ver-informe" aria-label="Informe de cierre">▤</button>
         <button class="icono ${hayAlerta ? 'alerta' : ''}" data-accion="ver-sobrante" aria-label="Lo que te sobra">◈</button>
         <button class="icono" data-accion="ver-ajustes" aria-label="Ajustes">⚙</button>
@@ -4122,8 +4807,26 @@ const { REGLAS_NUCLEO } = __req('src/dominio/reglas.js');
 const { etiquetaDestino } = __req('src/dominio/carry.js');
 const { porcentaje } = __req('src/dominio/dinero.js');
 
-const envolver = (contenido) => `<div class="velo" data-accion="cerrar-hoja"><div class="hoja" data-parar>
-  <div class="asa"></div>${contenido}</div></div>`;
+/**
+ * Envoltorio comun de todas las hojas.
+ *
+ * Aqui vive la semantica de dialogo, y por eso esta en un solo sitio: las diez
+ * hojas la heredan y cualquiera nueva tambien. Sin esto, abrir una hoja no
+ * anunciaba nada a un lector de pantalla y el foco se quedaba detras.
+ *
+ * El id del titulo se genera al vuelo y se engancha al primer <h2>, que todas
+ * tienen, para que aria-labelledby apunte a algo real.
+ */
+let contadorHojas = 0;
+
+const envolver = (contenido) => {
+  const idTitulo = `hoja-tit-${++contadorHojas}`;
+  const conId = contenido.replace('<h2', `<h2 id="${idTitulo}"`);
+  return `<div class="velo" data-accion="cerrar-hoja">
+    <div class="hoja" data-parar role="dialog" aria-modal="true" aria-labelledby="${idTitulo}" tabindex="-1">
+      <div class="asa" aria-hidden="true"></div>${conId}
+    </div></div>`;
+};
 
 /**
  * Hoja de rechazo. Nunca es un aviso que se desvanece: el usuario debe
@@ -4292,20 +4995,34 @@ function hojaDetalleTecho({ periodo, bucket, movimientos, fecha }) {
       .join('')}</div>` : ''}
 
     ${delBucket.length
-      ? `<h3>Últimos movimientos</h3><div class="lista">${delBucket.map((m) => filaMovimiento(m, CATEGORIAS)).join('')}</div>`
-      : '<p class="vacio">Todavía no hay movimientos en este techo.</p>'}
+      ? `<h3>Últimos movimientos</h3>
+         <p style="font-size:12.5px;margin:-4px 0 8px">Toca cualquiera para corregirlo o anularlo.</p>
+         <div class="lista">${delBucket.map((m) => filaMovimiento(m, CATEGORIAS, true)).join('')}</div>`
+      : '<p class="vacio">Todavía no hay movimientos en este techo.<br>Aparecerán aquí en cuanto registres el primero.</p>'}
 
     <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cerrar</button></div>`);
 }
 
 /** Informe de cierre archivado. */
-function hojaInforme({ informe, periodId }) {
+function hojaInforme({ informe, periodId, disponibles = [] }) {
   if (!informe) {
     return envolver(`
       <h2>Aún no hay informes</h2>
-      <p>El primero se genera automáticamente cuando termine el mes en curso. No tienes que hacer nada.</p>
+      <p>El primero se genera solo cuando termine el mes en curso: archiva lo gastado en cada
+      techo, manda a tu Fondo lo que no usaste de Reserva y calcula lo que te sobró.</p>
+      <p>No tienes que hacer nada. Basta con abrir la app algún día después del 1.</p>
       <div class="botones"><button class="btn" data-accion="cerrar-hoja">Entendido</button></div>`);
   }
+
+  // Selector de mes: los informes estan todos guardados en archives, solo que
+  // hasta ahora no habia forma de llegar a ninguno salvo al ultimo.
+  const selector = disponibles.length > 1
+    ? `<div class="filtros" style="margin-bottom:16px">
+         <select data-campo="mesInforme" aria-label="Mes del informe">
+           ${disponibles.map((m) => `<option value="${m}" ${m === informe.periodId ? 'selected' : ''}>${esc(nombrePeriodo(m))}</option>`).join('')}
+         </select>
+       </div>`
+    : '';
 
   const buckets = informe.porBucket
     .map((b) => {
@@ -4345,6 +5062,7 @@ function hojaInforme({ informe, periodId }) {
 
   return envolver(`
     <h2>${esc(nombrePeriodo(informe.periodId ?? periodId))}</h2>
+    ${selector}
     <div class="lista">
       <div class="fila"><span class="t">Ingresado</span><span class="v pos">${formatear(informe.ingresoTotal)}</span></div>
       <div class="fila"><span class="t">Gastado</span><span class="v">${formatear(informe.gastoTotal)}</span></div>
@@ -4360,6 +5078,15 @@ function hojaInforme({ informe, periodId }) {
     <div class="lista">${buckets}</div>
     ${cobros}
     ${choques}
+
+    <div class="aviso" style="margin:20px 0 0">
+      <strong>Buen momento para una copia.</strong>
+      El mes está cerrado y no hay sincronización: este teléfono es el único sitio
+      donde viven tus datos.
+      <div class="acciones">
+        <button class="principal" data-accion="exportar">Exportar copia</button>
+      </div>
+    </div>
 
     <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cerrar</button></div>`);
 }
@@ -4504,8 +5231,20 @@ function hojaAjustes({ ajustes, estadisticas, boveda }) {
       <div class="fila"><span class="t">Meses</span><span class="v">${estadisticas.periodos}</span></div>
     </div>
 
+    <h3>Cómo funciona</h3>
+    <div class="botones" style="margin-top:0">
+      <button class="btn" data-accion="ver-intro">Volver a ver la explicación</button>
+    </div>
+
+    <h3>Copias de seguridad</h3>
+    <p style="font-size:13px">No hay sincronización: este teléfono es el único sitio donde viven tus
+    datos. Exporta de vez en cuando; el archivo se puede volver a cargar aquí mismo.</p>
+    <div class="botones" style="margin-top:0">
+      <button class="btn" data-accion="exportar">Exportar una copia</button>
+      <button class="btn" data-accion="ver-importar">Restaurar una copia…</button>
+    </div>
+
     <div class="botones">
-      <button class="btn" data-accion="exportar">Exportar copia</button>
       <button class="btn" data-accion="cerrar-hoja">Cerrar</button>
       <button class="btn peligro" data-accion="borrar-todo">Borrar todo</button>
     </div>`);
@@ -4543,8 +5282,10 @@ function hojaFondos({ fondos, entradasAhorro, entradasCartera }) {
  * Sustituye al PIN y al anclaje mensual de saldo.
  */
 function hojaAlta({ moneda = 'R$' }) {
-  return `<div class="velo" style="align-items:center"><div class="hoja" data-parar style="border-radius:18px;margin:0 14px;max-width:420px">
-    <h2 style="margin-top:10px">¿Cuánto ingresas al mes?</h2>
+  return `<div class="velo" style="align-items:center">
+    <div class="hoja" data-parar role="dialog" aria-modal="true" aria-labelledby="alta-tit"
+         tabindex="-1" style="border-radius:18px;margin:0 14px;max-width:420px">
+    <h2 id="alta-tit" style="margin-top:10px">¿Cuánto ingresas al mes?</h2>
     <p>Lo pregunto una vez. A partir de ahí entra solo cada día 1 y se reparte en tus cuatro techos. No tendrás que teclear el saldo nunca más.</p>
     <div class="campo">
       <label for="alta-ingreso">Tu ingreso mensual normal</label>
@@ -4672,7 +5413,9 @@ function hojaSobrante({ pendiente, sobranteActual, historial, media, fondos }) {
           )
           .join('')}</div>
          ${media > 0 ? `<p style="font-size:12.5px;margin-top:10px">De media te sobran ${formatear(media)} al mes.</p>` : ''}`
-      : '<p class="vacio">Todavía no hay meses cerrados. El primer sobrante se calcula al acabar este mes.</p>'}
+      : `<p class="vacio">Todavía no hay meses cerrados.<br>
+           El primer sobrante se calcula solo al acabar este mes: será lo que no gastes
+           de Esenciales y Recompensas.</p>`}
 
     <p style="font-size:11.5px;color:var(--tinta-3);margin-top:14px">
       El sobrante de un mes no cambia aunque después lo inviertas: es lo que pasó ese mes.
@@ -4684,6 +5427,270 @@ function hojaSobrante({ pendiente, sobranteActual, historial, media, fondos }) {
 function etiquetaSobrante(destino) {
   const d = DESTINOS_SOBRANTE.find((x) => x.id === destino);
   return d ? d.nombre : destino;
+}
+
+
+/**
+ * Un movimiento, con las salidas para corregirlo (UX-01).
+ *
+ * En el mes abierto se puede cambiar el importe o anularlo. En un mes cerrado
+ * no: el archivo es inmutable, asi que lo unico que se ofrece es anotar la
+ * correccion en el mes en curso, que es lo que pide R-18.
+ */
+function hojaMovimiento({ movimiento, editable, ajustes, borrador }) {
+  const m = movimiento;
+  const cat = CATEGORIAS[m.categoryId]?.nombre;
+  const destino = etiquetaDeDestino(m, ajustes);
+  const esIngreso = m.tipo === 'ingreso';
+
+  return envolver(`
+    <h2>${esIngreso ? 'Ingreso' : 'Gasto'} de ${formatear(m.importeCents)}</h2>
+
+    <div class="lista">
+      <div class="fila"><span class="t">Fecha</span><span class="v">${esc(m.localDate)}</span></div>
+      ${m.bucket ? `<div class="fila"><span class="t">Techo</span><span class="v">${esc(ETIQUETAS[m.bucket] ?? m.bucket)}</span></div>` : ''}
+      ${destino ? `<div class="fila"><span class="t">Destino</span><span class="v">${esc(destino)}</span></div>` : ''}
+      ${cat ? `<div class="fila"><span class="t">Categoría</span><span class="v">${esc(cat)}</span></div>` : ''}
+      ${m.nota ? `<div class="fila"><span class="t">Nota</span><span class="v" style="font-weight:400;text-align:left">${esc(m.nota)}</span></div>` : ''}
+      ${m.bucketOriginal ? `<div class="fila"><span class="t">Lo intentaste en</span><span class="v">${esc(ETIQUETAS[m.bucketOriginal])}</span>
+        <span class="s">una regla lo movió</span></div>` : ''}
+    </div>
+
+    ${editable
+      ? `<h3>Corregir el importe</h3>
+         <div class="campo">
+           <label for="nuevo-importe">Cuánto era en realidad</label>
+           <input id="nuevo-importe" type="text" inputmode="decimal" data-campo="nuevoImporte"
+                  value="${esc(borrador ?? formatear(m.importeCents).replace(/^\D+/, ''))}" autocomplete="off">
+         </div>
+         <div class="botones" style="margin-top:0">
+           <button class="btn principal" data-accion="guardar-correccion" data-id="${esc(m.id)}">Guardar el nuevo importe</button>
+           <button class="btn peligro" data-accion="anular-movimiento" data-id="${esc(m.id)}">Anular este movimiento</button>
+           <button class="btn" data-accion="cerrar-hoja">Dejarlo como está</button>
+         </div>`
+      : `<div class="aviso" style="margin:16px 0 0">
+           <strong>Ese mes ya está cerrado.</strong>
+           El archivo no se toca: es lo que hace que el histórico cuadre. Puedes anotar la
+           corrección en el mes en curso.
+         </div>
+         <div class="botones">
+           <button class="btn principal" data-accion="corregir-en-abierto" data-id="${esc(m.id)}">Anotar corrección en el mes abierto</button>
+           <button class="btn" data-accion="cerrar-hoja">Cerrar</button>
+         </div>`}`);
+}
+
+function etiquetaDeDestino(m, ajustes) {
+  if (!m?.destinoId) return null;
+  if (m.destinoTexto) return m.destinoTexto;
+  return destinosDe(ajustes, m.bucket).find((d) => d.id === m.destinoId)?.nombre ?? m.destinoId;
+}
+
+/**
+ * Restaurar una copia (UX-03).
+ *
+ * Sustituye todo lo que hay, asi que primero se enseña que trae el archivo y
+ * que se va a perder. Nadie deberia pulsar esto sin ver las dos columnas.
+ */
+function hojaImportar({ analisis, error }) {
+  if (!analisis) {
+    return envolver(`
+      <h2>Restaurar una copia</h2>
+      <p>Sustituye <strong>todo</strong> lo que hay en este teléfono por lo que traiga el archivo.
+      Antes de nada te enseño qué contiene y qué se pierde.</p>
+      ${error ? `<div class="aviso rojo" style="margin:0 0 14px"><strong>No pude leer ese archivo.</strong> ${esc(error)}</div>` : ''}
+      <div class="botones">
+        <button class="btn principal" data-accion="elegir-copia">Elegir archivo…</button>
+        <button class="btn" data-accion="cerrar-hoja">Cancelar</button>
+      </div>`);
+  }
+
+  const e = analisis.entrante;
+  const a = analisis.actual;
+  return envolver(`
+    <h2>¿Restauro esta copia?</h2>
+    <p>Lo de la izquierda desaparece. Lo de la derecha ocupa su lugar.</p>
+
+    <div class="lista">
+      <div class="fila"><span class="t">Meses</span>
+        <span class="v"><span class="neg">${a.periodos}</span> → <span class="pos">${e.periodos}</span></span></div>
+      <div class="fila"><span class="t">Movimientos</span>
+        <span class="v"><span class="neg">${a.movimientos}</span> → <span class="pos">${e.movimientos}</span></span></div>
+      ${e.primerMes ? `<div class="fila"><span class="t">Periodo de la copia</span>
+        <span class="v">${esc(nombrePeriodo(e.primerMes))} – ${esc(nombrePeriodo(e.ultimoMes))}</span></div>` : ''}
+      ${e.informes ? `<div class="fila"><span class="t">Informes archivados</span><span class="v">${e.informes}</span></div>` : ''}
+      ${e.sobrantes ? `<div class="fila"><span class="t">Sobrantes</span><span class="v">${e.sobrantes}</span></div>` : ''}
+    </div>
+
+    <div class="aviso rojo" style="margin:16px 0 0">
+      <strong>No hay vuelta atrás.</strong>
+      Si lo de este teléfono te importa, expórtalo antes de restaurar.
+    </div>
+
+    <div class="botones">
+      <button class="btn peligro" data-accion="confirmar-restauracion">Sí, restaurar y perder lo actual</button>
+      <button class="btn" data-accion="exportar">Exportar lo de ahora primero</button>
+      <button class="btn" data-accion="cerrar-hoja">Cancelar</button>
+    </div>`);
+}
+
+/**
+ * Detalles opcionales del registro: nota libre y fecha (UX-04, UX-05).
+ *
+ * Fuera del camino rapido a proposito. Quien registre y siga no la ve nunca;
+ * quien quiera explicar algo o anotar lo del domingo, la abre.
+ */
+function hojaDetalles({ captura, periodo, fechaHoy }) {
+  const primerDia = `${periodo.id}-01`;
+  const ultimoDia = `${periodo.id}-${String(diasEnPeriodo(periodo.id)).padStart(2, '0')}`;
+  const tope = fechaHoy < ultimoDia ? fechaHoy : ultimoDia;
+
+  return envolver(`
+    <h2>Detalles</h2>
+    <p>Los dos son opcionales. Sin tocarlos, el gasto se anota hoy y sin nota.</p>
+
+    <div class="campo">
+      <label for="det-nota">Nota</label>
+      <textarea id="det-nota" data-campo="nota"
+                placeholder="Para acordarte dentro de tres meses">${esc(captura?.nota ?? '')}</textarea>
+      <span class="ayuda">Libre. Aparece en el historial y al abrir el movimiento.</span>
+    </div>
+
+    <div class="campo">
+      <label for="det-fecha">Fecha</label>
+      <input id="det-fecha" type="date" data-campo="fecha"
+             value="${esc(captura?.localDate ?? fechaHoy)}"
+             min="${esc(primerDia)}" max="${esc(tope)}">
+      <span class="ayuda">Solo dentro del mes abierto: los meses cerrados no se tocan.</span>
+    </div>
+
+    <div class="botones">
+      <button class="btn principal" data-accion="guardar-detalles">Aplicar</button>
+      <button class="btn" data-accion="limpiar-detalles">Quitar nota y volver a hoy</button>
+    </div>`);
+}
+
+
+/**
+ * Historial de movimientos (UX-02).
+ *
+ * Agrupado por dia porque asi se recuerda el gasto: «el martes» antes que «el
+ * 11 de septiembre». Cada fila abre el movimiento, que es desde donde se
+ * corrige.
+ */
+function hojaHistorial({ datos, meses, ajustes }) {
+  const nombreDia = (fecha) => {
+    const [a, m, d] = fecha.split('-').map(Number);
+    const semana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    return `${semana[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]} ${d}`;
+  };
+
+  const filtros = `
+    <div class="filtros">
+      <select data-campo="mesHistorial" aria-label="Mes">
+        ${meses.map((m) => `<option value="${m}" ${m === datos.periodId ? 'selected' : ''}>${esc(nombrePeriodo(m))}</option>`).join('')}
+      </select>
+      <input type="search" data-campo="buscaHistorial" placeholder="Buscar nota o destino…"
+             value="${esc(datos.filtro.texto)}" aria-label="Buscar">
+    </div>
+    <div class="etiquetas" style="margin-bottom:16px">
+      <button data-accion="filtrar-techo" data-bucket="" aria-pressed="${!datos.filtro.bucket}">Todos</button>
+      ${ORDEN.map((b) => `<button data-accion="filtrar-techo" data-bucket="${b}"
+            aria-pressed="${datos.filtro.bucket === b}">${esc(ETIQUETAS[b])}</button>`).join('')}
+    </div>`;
+
+  const cuerpo = datos.dias.length
+    ? datos.dias.map((d) => `
+        <div class="dia">
+          <div class="dia-cab">
+            <span class="dia-nom">${esc(nombreDia(d.fecha))}</span>
+            <span class="dia-tot">
+              ${d.gastado ? `−${formatear(d.gastado)}` : ''}
+              ${d.ingresado ? `<span class="pos">+${formatear(d.ingresado)}</span>` : ''}
+            </span>
+          </div>
+          <div class="lista">${d.movimientos.map((m) => filaMovimiento(m, CATEGORIAS, true)).join('')}</div>
+        </div>`).join('')
+    : `<p class="vacio">${datos.filtro.texto || datos.filtro.bucket
+        ? 'Nada coincide con ese filtro.'
+        : 'Este mes todavía no tiene movimientos.<br>Aparecerán aquí en cuanto registres el primero.'}</p>`;
+
+  return envolver(`
+    <h2>Movimientos</h2>
+    ${filtros}
+    ${cuerpo}
+    ${datos.hayMas ? '<p style="font-size:12.5px;text-align:center">Se muestran los 120 más recientes.</p>' : ''}
+    <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cerrar</button></div>`);
+}
+
+
+/**
+ * Introduccion en tres tarjetas (UX-10).
+ *
+ * Sin esto, la primera vez que una regla rechaza algo la reaccion razonable es
+ * pensar que la app esta rota: nadie ha explicado nunca que hay un motor de
+ * reglas, ni que el dia 1 va a pasar algo solo. Se enseña una vez, es
+ * saltable, y queda accesible desde Ajustes.
+ *
+ * Usa las cifras de quien la lee, no ejemplos inventados.
+ */
+function hojaIntro({ paso = 0, ingresoNormal = 0, pesos }) {
+  const p = pesos ?? { ESENCIALES: 5000, INVERSION: 2500, RESERVA: 1500, RECOMPENSAS: 1000 };
+  const parte = (b) => formatear(Math.round((ingresoNormal * p[b]) / 10_000));
+
+  const pasos = [
+    {
+      titulo: 'Tu mes se parte en cuatro',
+      cuerpo: ingresoNormal > 0
+        ? `<p>Cada día 1 entran tus ${formatear(ingresoNormal)} y se reparten solos:</p>
+           <div class="lista">
+             ${ORDEN.map((b) => `<div class="fila"><span class="t">${esc(ETIQUETAS[b])}</span>
+                <span class="v">${parte(b)}</span><span class="s">${p[b] / 100} %</span></div>`).join('')}
+           </div>
+           <p>Eso son tus <strong>techos</strong>. Cada gasto consume el suyo, y la barra te dice
+           cuánto queda sin tener que sumar nada.</p>`
+        : `<p>El dinero del mes se reparte en cuatro techos: Esenciales, Inversión, Reserva y
+           Recompensas. Cada gasto consume el suyo, y la barra te dice cuánto queda.</p>`,
+    },
+    {
+      titulo: 'A veces te va a decir que no',
+      cuerpo: `<p>Hay dieciocho reglas que impiden colar un gasto donde no toca. Un regalo no
+        entra en Esenciales por mucho que lo intentes: va a Recompensas, aunque sea para otra
+        persona.</p>
+        <p>No es para fastidiar. Un presupuesto no se rompe por el importe, se rompe por la
+        etiqueta: basta llamar «esencial» a lo que no lo es para que las cuentas cuadren en el
+        papel y no en el banco.</p>
+        <p><strong>Nunca bloquea un gasto que ya ocurrió</strong>, solo la etiqueta que le pones.
+        Si te pasas del techo, lo registra igual y lo pinta en rojo.</p>`,
+    },
+    {
+      titulo: 'El día 1 pasa solo',
+      cuerpo: `<p>Al abrir la app el día 1 —o el 7, da igual— se cierra el mes anterior sin que
+        hagas nada: archiva el informe, manda a tu Fondo de Ahorro lo que no gastaste de Reserva
+        y pone los cuatro techos a cero.</p>
+        <p>También calcula <strong>lo que te sobró</strong> de Esenciales y Recompensas, y te
+        pregunta qué hacer con ello. Esa cifra queda en el historial y ya no cambia, hagas lo
+        que hagas después con el dinero.</p>`,
+    },
+  ];
+
+  const actual = pasos[Math.min(paso, pasos.length - 1)];
+  const ultimo = paso >= pasos.length - 1;
+
+  return envolver(`
+    <h2>${esc(actual.titulo)}</h2>
+    ${actual.cuerpo}
+    <div class="puntos-intro" aria-hidden="true">
+      ${pasos.map((_, i) => `<span class="${i === paso ? 'activo' : ''}"></span>`).join('')}
+    </div>
+    <div class="botones">
+      <button class="btn principal" data-accion="intro-siguiente" data-paso="${paso + 1}">
+        ${ultimo ? 'Empezar' : 'Siguiente'}
+      </button>
+      ${ultimo ? '' : '<button class="btn" data-accion="intro-saltar">Saltar</button>'}
+    </div>
+    <p style="font-size:11.5px;color:var(--tinta-3);text-align:center;margin:14px 0 0">
+      ${paso + 1} de ${pasos.length} · lo tienes otra vez en Ajustes
+    </p>`);
 }
 
 
@@ -4699,6 +5706,11 @@ function etiquetaSobrante(destino) {
   __e.hojaAlta = hojaAlta;
   __e.hojaDestinos = hojaDestinos;
   __e.hojaSobrante = hojaSobrante;
+  __e.hojaMovimiento = hojaMovimiento;
+  __e.hojaImportar = hojaImportar;
+  __e.hojaDetalles = hojaDetalles;
+  __e.hojaHistorial = hojaHistorial;
+  __e.hojaIntro = hojaIntro;
 };
 
 __m['src/dominio/periodo.js'] = function (__e, __req) {

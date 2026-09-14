@@ -23,6 +23,28 @@ import {
   esVisperaDeCierre, DESTINOS_SOBRANTE, mediaSobrante,
 } from '../dominio/sobrante.js';
 
+/**
+ * Comprime y descomprime con la API del navegador, sin dependencias.
+ * En Node (los tests) CompressionStream tambien existe desde la v18.
+ */
+async function comprimir(texto) {
+  if (typeof CompressionStream === 'undefined') return texto; // sin soporte: se guarda tal cual
+  const flujo = new Blob([texto]).stream().pipeThrough(new CompressionStream('gzip'));
+  const bytes = new Uint8Array(await new Response(flujo).arrayBuffer());
+  let binario = '';
+  for (const b of bytes) binario += String.fromCharCode(b);
+  return `gz:${btoa(binario)}`;
+}
+
+async function descomprimir(dato) {
+  if (typeof dato !== 'string' || !dato.startsWith('gz:')) return dato;
+  const binario = atob(dato.slice(3));
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(flujo).text();
+}
+
 export function crearComandos(repo, reloj) {
   /** Cierre en vuelo, para que varios disparadores simultaneos no dupliquen trabajo. */
   let cierreEnCurso = null;
@@ -412,6 +434,214 @@ export function crearComandos(repo, reloj) {
       return { ok: true, movimiento: mov, reparto: reparto.partes, detalleReparto: reparto, periodo: actualizado };
     },
 
+    // --- corregir lo ya registrado --------------------------------------
+
+    /** Un movimiento con lo que la interfaz necesita para enseñarlo y juzgarlo. */
+    async movimiento(id) {
+      const abierto = await comandos.periodoActual();
+      const cerrados = (await repo.periodosCerrados()).map((p) => p.id);
+
+      for (const periodId of [abierto.id, ...cerrados]) {
+        const movs = await repo.movimientos({ periodId });
+        const m = movs.find((x) => x.id === id);
+        if (m) return { movimiento: m, editable: periodId === abierto.id, periodId };
+      }
+      return null;
+    },
+
+    /**
+     * Anula un movimiento del mes abierto.
+     *
+     * El ledger es inmutable a proposito, pero eso no puede significar que un
+     * cero de mas quede grabado para siempre. Dentro del mes abierto se borra
+     * de verdad y se recalcula el periodo desde sus movimientos, que es
+     * exactamente lo que ya hacia deshacer. En un mes cerrado no se toca nada:
+     * el archivo es inmutable y ahi si manda R-18.
+     */
+    async anularMovimiento(id) {
+      const encontrado = await comandos.movimiento(id);
+      if (!encontrado) return { ok: false, codigo: 'NO_ENCONTRADO' };
+      if (!encontrado.editable) return { ok: false, codigo: 'MES_CERRADO', periodId: encontrado.periodId };
+
+      const { movimiento: mov, periodId } = encontrado;
+
+      await repo.motor.transaccion(['movements', 'allocations', 'periods', 'auditLog'], async () => {
+        await repo.motor.borrar('movements', mov.id);
+        const asigs = await repo.asignaciones(periodId);
+        for (const a of asigs.filter((x) => x.movementId === mov.id)) {
+          await repo.motor.borrar('allocations', a.id);
+        }
+      });
+
+      await repo.agregarEvento({
+        tipo: 'MOVIMIENTO_ANULADO',
+        periodId,
+        detalle: { id: mov.id, importeCents: mov.importeCents, bucket: mov.bucket },
+      });
+      const periodo = await comandos.recalcularPeriodo(periodId);
+      return { ok: true, periodo };
+    },
+
+    /**
+     * Corrige un movimiento del mes abierto.
+     *
+     * Se anula y se vuelve a registrar con los datos nuevos, para que pase por
+     * las mismas reglas que cualquier otro. Si el nuevo importe choca con una
+     * regla, se devuelve el veredicto y NO se pierde el original: la anulacion
+     * solo se confirma cuando el reemplazo entra.
+     */
+    async editarMovimiento(id, cambios) {
+      const encontrado = await comandos.movimiento(id);
+      if (!encontrado) return { ok: false, codigo: 'NO_ENCONTRADO' };
+      if (!encontrado.editable) return { ok: false, codigo: 'MES_CERRADO', periodId: encontrado.periodId };
+
+      const original = encontrado.movimiento;
+      const anulado = await comandos.anularMovimiento(id);
+      if (!anulado.ok) return anulado;
+
+      const rehacer = {
+        importeCents: cambios.importeCents ?? original.importeCents,
+        bucket: cambios.bucket ?? original.bucket,
+        categoryId: cambios.categoryId ?? original.categoryId,
+        destinoId: cambios.destinoId ?? original.destinoId,
+        destinoTexto: cambios.destinoTexto ?? original.destinoTexto,
+        nota: cambios.nota ?? original.nota,
+        tags: original.tags,
+        razonReserva: original.razonReserva,
+        localDate: cambios.localDate ?? original.localDate,
+        ts: cambios.ts ?? original.ts,
+        // El bucket ya es el que la regla forzo en su dia, asi que un FORCE no
+        // vuelve a saltar. Pero `confirmado` NO se hereda: si la correccion
+        // trae otro cero de mas, R-17 tiene que volver a preguntarlo. Ese es
+        // justo el momento en que mas facil es equivocarse otra vez.
+        aceptaForzado: true,
+        confirmado: cambios.confirmado ?? false,
+        justificacion: original.justificacion,
+      };
+
+      const r = original.tipo === 'ingreso'
+        ? await comandos.registrarIngreso({ ...rehacer, buckets: cambios.buckets })
+        : await comandos.registrarGasto(rehacer);
+
+      if (!r.ok) {
+        // El reemplazo no entro: se repone el original para no perder nada.
+        await repo.escribirMovimiento({ mov: original, periodo: await comandos.periodoActual() });
+        await comandos.recalcularPeriodo(encontrado.periodId);
+        return { ok: false, codigo: 'RECHAZADO', veredicto: r.veredicto, requiere: r.requiere };
+      }
+
+      await repo.agregarEvento({
+        tipo: 'MOVIMIENTO_CORREGIDO',
+        periodId: encontrado.periodId,
+        detalle: { de: original.importeCents, a: rehacer.importeCents, idOriginal: id },
+      });
+      return { ok: true, movimiento: r.movimiento };
+    },
+
+    // --- historial (UX-02) ------------------------------------------------
+
+    /**
+     * Movimientos de un mes, agrupados por dia y filtrables.
+     *
+     * Es la respuesta a «¿en que se me fue el mes?», que hasta ahora no
+     * existia dentro de la app: lo unico consultable eran los diez ultimos de
+     * un techo, enterrados en la hoja de detalle.
+     */
+    async historial({ periodId, bucket = null, texto = '', limite = 120 } = {}) {
+      const mes = periodId ?? (await comandos.periodoActual()).id;
+      const ajustes = await repo.ajustes();
+      const movimientos = await repo.movimientos({ periodId: mes, descendente: true });
+
+      const busca = texto.trim().toLowerCase();
+      const coincide = (m) => {
+        if (bucket && m.bucket !== bucket) return false;
+        if (!busca) return true;
+        const cat = CATEGORIAS[m.categoryId]?.nombre ?? '';
+        const dest = m.destinoTexto ?? destinosDe(ajustes, m.bucket).find((d) => d.id === m.destinoId)?.nombre ?? '';
+        return `${m.nota} ${cat} ${dest}`.toLowerCase().includes(busca);
+      };
+
+      const filtrados = movimientos.filter(coincide).slice(0, limite);
+
+      // Agrupado por dia, que es como se recuerda el gasto.
+      const dias = [];
+      for (const m of filtrados) {
+        const ultimo = dias[dias.length - 1];
+        if (ultimo?.fecha === m.localDate) ultimo.movimientos.push(m);
+        else dias.push({ fecha: m.localDate, movimientos: [m] });
+      }
+      for (const d of dias) {
+        d.gastado = d.movimientos.filter((m) => m.tipo === 'gasto').reduce((a, m) => a + m.importeCents, 0);
+        d.ingresado = d.movimientos.filter((m) => m.tipo === 'ingreso').reduce((a, m) => a + m.importeCents, 0);
+      }
+
+      return {
+        periodId: mes,
+        dias,
+        total: filtrados.length,
+        hayMas: movimientos.filter(coincide).length > filtrados.length,
+        filtro: { bucket, texto },
+      };
+    },
+
+    /** Meses con datos, del mas reciente al mas antiguo, para los selectores. */
+    async mesesDisponibles() {
+      const periodos = await repo.periodos();
+      return periodos.map((p) => p.id).sort().reverse();
+    },
+
+    // --- copias de seguridad ---------------------------------------------
+
+    /**
+     * Mira una copia sin tocar nada y cuenta que trae.
+     *
+     * Restaurar sustituye todo lo que hay, asi que la decision no puede
+     * tomarse a ciegas: esto es lo que se enseña antes de preguntar.
+     */
+    async analizarCopia(datos) {
+      if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
+        return { valido: false, motivo: 'El archivo no tiene la forma de una copia de finc.' };
+      }
+      const imprescindibles = ['periods', 'movements', 'settings'];
+      const faltan = imprescindibles.filter((k) => !Array.isArray(datos[k]));
+      if (faltan.length) {
+        return { valido: false, motivo: `Al archivo le faltan datos (${faltan.join(', ')}).` };
+      }
+
+      const periodos = datos.periods.map((p) => p.id).filter(Boolean).sort();
+      const actual = await repo.estadisticas();
+
+      return {
+        valido: true,
+        entrante: {
+          periodos: periodos.length,
+          primerMes: periodos[0] ?? null,
+          ultimoMes: periodos[periodos.length - 1] ?? null,
+          movimientos: datos.movements.length,
+          sobrantes: (datos.sobrantes ?? []).length,
+          informes: (datos.archives ?? []).length,
+        },
+        actual: { periodos: actual.periodos, movimientos: actual.movimientos },
+      };
+    },
+
+    /** Sustituye el almacen por el de la copia. Irreversible. */
+    async restaurarCopia(datos) {
+      const analisis = await comandos.analizarCopia(datos);
+      if (!analisis.valido) return { ok: false, motivo: analisis.motivo };
+
+      await repo.vaciar();
+      await repo.importar(datos);
+
+      // Los totales se rehacen desde los movimientos: si la copia venia de una
+      // version anterior, el recalculo la deja coherente con el motor de hoy.
+      for (const p of await repo.periodos()) {
+        if (p.status === 'abierto') await comandos.recalcularPeriodo(p.id);
+      }
+      await repo.agregarEvento({ tipo: 'COPIA_RESTAURADA', detalle: analisis.entrante });
+      return { ok: true, resumen: analisis.entrante };
+    },
+
     /** Deshacer: solo dentro de la ventana de gracia (§11.1). */
     async deshacer(movimientoId, ventanaMs = 8000) {
       const periodo = await comandos.periodoActual();
@@ -491,6 +721,60 @@ export function crearComandos(repo, reloj) {
       });
 
       return { ok: true, registro: actualizado };
+    },
+
+    // --- compactacion de meses frios (UX-15) ------------------------------
+
+    /**
+     * Comprime los periodos de mas de N meses y borra sus filas calientes.
+     *
+     * El historial vive entero en `movements`, que esta bien mientras son
+     * cientos de filas y deja de estarlo cuando son cientos de miles. Aqui el
+     * orden importa: se comprime ANTES de cifrar, porque el texto cifrado es
+     * incompresible por definicion y el gzip no ahorraria nada.
+     *
+     * Se ejecuta en segundo plano tras un cierre, nunca durante: el cierre
+     * tiene que terminar en milisegundos.
+     */
+    async compactarMesesFrios({ mesesCalientes = 24 } = {}) {
+      const cerrados = await repo.periodosCerrados();
+      const frios = cerrados.slice(0, Math.max(0, cerrados.length - mesesCalientes));
+      if (!frios.length) return { compactados: 0, filas: 0 };
+
+      let filas = 0;
+      for (const p of frios) {
+        const movimientos = await repo.movimientos({ periodId: p.id, descendente: false });
+        if (!movimientos.length) continue;
+
+        const archivo = (await repo.informe(p.id)) ?? null;
+        const comprimido = await comprimir(JSON.stringify(movimientos));
+
+        await repo.motor.transaccion(['archives', 'movements', 'allocations'], async () => {
+          await repo.guardarArchivo({
+            periodId: p.id,
+            formatVersion: 1,
+            informe: archivo,
+            movimientosGz: comprimido,
+            archivadoEn: reloj.ahora(),
+          });
+          for (const m of movimientos) await repo.motor.borrar('movements', m.id);
+          for (const a of await repo.asignaciones(p.id)) await repo.motor.borrar('allocations', a.id);
+        });
+        filas += movimientos.length;
+      }
+
+      await repo.agregarEvento({
+        tipo: 'MESES_COMPACTADOS',
+        detalle: { meses: frios.map((p) => p.id), filas },
+      });
+      return { compactados: frios.length, filas };
+    },
+
+    /** Movimientos de un mes ya compactado, descomprimidos al vuelo. */
+    async movimientosArchivados(periodId) {
+      const archivo = await repo.archivo(periodId);
+      if (!archivo?.movimientosGz) return null;
+      return JSON.parse(await descomprimir(archivo.movimientosGz));
     },
 
     // --- diagnostico ------------------------------------------------------

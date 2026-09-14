@@ -256,6 +256,49 @@ def maqueta_pantalla_inicio(maestro, pixel_art, nombre="finc"):
     return lienzo
 
 
+
+# =========================================================================
+# Pantallas de arranque de iOS (UX-14)
+# =========================================================================
+
+# Tamaños logicos y densidad de los iPhone en uso. iOS elige la que coincide
+# exactamente con la pantalla; si no hay ninguna, enseña blanco.
+PANTALLAS = [
+    (1290, 2796, 3, "iPhone 15/16 Pro Max"),
+    (1179, 2556, 3, "iPhone 15/16"),
+    (1284, 2778, 3, "iPhone 13/14 Pro Max"),
+    (1170, 2532, 3, "iPhone 13/14"),
+    (1125, 2436, 3, "iPhone X/XS/11 Pro"),
+    (1242, 2688, 3, "iPhone XS Max/11 Pro Max"),
+    (828, 1792, 2, "iPhone XR/11"),
+    (750, 1334, 2, "iPhone SE"),
+]
+
+
+def pantalla_arranque(maestro, fondo, pixel_art, ancho, alto):
+    """Icono centrado sobre el fondo de la portada, a un tercio del ancho."""
+    lienzo = Image.new("RGB", (ancho, alto), fondo)
+    lado = ancho // 3
+    if pixel_art:
+        # Multiplo exacto del lado logico: si no, los pixeles salen desiguales.
+        lado = max(maestro.width, (lado // maestro.width) * maestro.width)
+    icono = escalar(maestro, lado, pixel_art)
+    lienzo.paste(icono, ((ancho - lado) // 2, (alto - lado) // 2))
+    return lienzo
+
+
+def etiquetas_html():
+    """Las etiquetas <link> que hay que pegar en index.html."""
+    lineas = []
+    for ancho, alto, densidad, nombre in PANTALLAS:
+        medios = (f"(device-width: {ancho // densidad}px) and "
+                  f"(device-height: {alto // densidad}px) and "
+                  f"(-webkit-device-pixel-ratio: {densidad})")
+        lineas.append(f'<link rel="apple-touch-startup-image" media="{medios}" '
+                      f'href="./iconos/arranque-{ancho}x{alto}.png"><!-- {nombre} -->')
+    return "\n".join(lineas)
+
+
 def main():
     if not os.path.exists(FUENTE):
         sys.exit(f"No encuentro la portada en {FUENTE}")
@@ -288,6 +331,15 @@ def main():
     maqueta_pantalla_inicio(maestro, pixel_art).save(
         os.path.join(DESTINO, "pantalla-inicio.png"))
     print("  iconos/pantalla-inicio.png  (cómo queda en el móvil)")
+
+    for ancho, alto, _, nombre in PANTALLAS:
+        ruta = os.path.join(DESTINO, f"arranque-{ancho}x{alto}.png")
+        pantalla_arranque(maestro, fondo, pixel_art, ancho, alto).save(ruta, optimize=True)
+    print(f"  iconos/arranque-*.png  ({len(PANTALLAS)} pantallas de arranque)")
+
+    with open(os.path.join(DESTINO, "etiquetas-arranque.html"), "w", encoding="utf-8") as f:
+        f.write(etiquetas_html() + "\n")
+    print("  iconos/etiquetas-arranque.html  (para pegar en index.html)")
 
 
 if __name__ == "__main__":

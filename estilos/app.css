@@ -15,7 +15,7 @@
   --sup-3: #dfe2eb;
   --tinta: #161a26;
   --tinta-2: #4a5164;
-  --tinta-3: #767d92;
+  --tinta-3: #5f677d;   /* 4,6:1 sobre el papel; #767d92 se quedaba en 3,7 */
   --linea: #d2d7e2;
   --acento: #2e3f86;
   --acento-suave: #dee3f6;
@@ -75,10 +75,12 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 }
 .cabecera .periodo { font-weight: 600; font-size: 15px; }
 .cabecera .sub { font-size: 12px; color: var(--tinta-3); }
-.cabecera .iconos { display: flex; gap: 4px; }
+.cabecera .iconos { display: flex; gap: 2px; margin-right: -6px; }
 .icono {
-  width: 36px; height: 36px; display: grid; place-items: center;
-  border-radius: 9px; font-size: 17px; color: var(--tinta-2);
+  /* 44 px es el minimo tactil de iOS. El glifo sigue a 17 px: lo que crece
+     es la zona que responde al dedo, no el dibujo. */
+  width: 44px; height: 44px; display: grid; place-items: center;
+  border-radius: 10px; font-size: 17px; color: var(--tinta-2);
 }
 .icono:active { background: var(--sup-2); }
 .icono.alerta { color: var(--mal); }
@@ -117,6 +119,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 .aviso.rojo { background: var(--mal-suave); border-left-color: var(--mal); }
 .aviso.ambar { background: var(--avisa-suave); border-left-color: var(--avisa); }
 .aviso.verde { background: var(--ok-suave); border-left-color: var(--ok); }
+.hoja .aviso.rojo strong, .hoja .aviso strong { display: block; margin-bottom: 3px; }
 .aviso .acciones { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .aviso button {
   padding: 6px 12px; border-radius: 7px; font-size: 13px; font-weight: 600;
@@ -185,16 +188,30 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   background: var(--sup-2); border-radius: 9px; margin-bottom: 7px;
 }
 .conmutador button {
-  flex: 1; padding: 6px; border-radius: 7px; font-size: 13.5px; font-weight: 600;
+  flex: 1; min-height: 44px; border-radius: 7px; font-size: 13.5px; font-weight: 600;
   color: var(--tinta-3);
 }
 .conmutador button[aria-pressed='true'] { background: var(--sup); color: var(--tinta); }
 
 .visor {
-  text-align: right;
   padding: 2px 8px 8px;
   min-height: 52px;
-  display: flex; flex-direction: column; justify-content: flex-end;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
+}
+.visor .cifra-visor { text-align: right; flex: 1; min-width: 0; }
+/* Acceso a nota y fecha. Fuera del camino rapido: quien registra y sigue no lo
+   toca nunca, y quien quiera explicar algo lo tiene a un dedo. */
+.visor .detalles {
+  position: relative; flex: none;
+  width: 44px; height: 44px; border-radius: 11px;
+  background: var(--sup-2); color: var(--tinta-3);
+  font-size: 15px; font-weight: 600;
+  display: grid; place-items: center;
+}
+.visor .detalles.puesto { background: var(--acento-suave); color: var(--acento); }
+.visor .detalles .punto {
+  position: absolute; top: 7px; right: 7px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--acento);
 }
 .visor .importe {
   font-size: 38px; font-weight: 700; letter-spacing: -.02em; line-height: 1;
@@ -211,6 +228,16 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   border: 2px solid transparent;
 }
 .ficha[aria-pressed='true'] { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); }
+
+/* Sustituye a la vibracion, que Safari en iOS no implementa: un destello
+   corto al marcar o al guardar. Es el mismo acuse de recibo por otro canal. */
+@keyframes destello {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 var(--acento); }
+  40%  { transform: scale(.965); box-shadow: 0 0 0 4px var(--acento-suave); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 transparent; }
+}
+.destello { animation: destello 260ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .destello { animation: none; } }
 .ficha .restante { display: block; font-size: 10px; font-weight: 500; color: var(--tinta-3); margin-top: 2px; }
 .ficha[aria-pressed='true'] .restante { color: var(--acento); }
 
@@ -297,6 +324,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   padding: 11px 13px; background: var(--paper); align-items: baseline;
 }
 .fila .t { font-size: 14.5px; }
+/* Filas que se pueden tocar para abrir el movimiento (UX-01). */
+button.fila.tocable {
+  width: 100%; text-align: left; font: inherit;
+  min-height: 48px; align-content: center;
+}
+button.fila.tocable:active { background: var(--sup-2); }
+button.fila.tocable .t::after { content: ' ›'; color: var(--tinta-3); }
 .fila .s { grid-column: 1; font-size: 12px; color: var(--tinta-3); }
 .fila .v { font-size: 14.5px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .fila .v.neg { color: var(--mal); }
@@ -313,6 +347,36 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 .campo textarea { min-height: 78px; resize: vertical; }
 .campo .ayuda { font-size: 11.5px; color: var(--tinta-3); margin-top: 4px; }
 .campo.error input, .campo.error textarea { border-color: var(--mal); }
+
+/* Progreso de la introduccion. */
+.puntos-intro { display: flex; gap: 7px; justify-content: center; margin: 20px 0 0; }
+.puntos-intro span {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--sup-3);
+}
+.puntos-intro span.activo { background: var(--acento); }
+
+.filtros { display: flex; gap: 8px; margin-bottom: 12px; }
+.filtros select, .filtros input {
+  flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--linea); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 16px; user-select: text;
+}
+.filtros select { flex: 0 1 auto; }
+
+.dia { margin-bottom: 16px; }
+.dia-cab {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; padding: 0 2px 5px;
+}
+.dia-nom {
+  font-size: 12.5px; font-weight: 600; color: var(--tinta-2);
+  text-transform: capitalize;
+}
+.dia-tot {
+  font-size: 12.5px; color: var(--tinta-3);
+  font-variant-numeric: tabular-nums; display: flex; gap: 8px;
+}
+.dia-tot .pos { color: var(--ok); }
 
 .etiquetas { display: flex; flex-wrap: wrap; gap: 6px; }
 .etiquetas button {

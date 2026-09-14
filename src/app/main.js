@@ -29,6 +29,7 @@ import {
 import {
   hojaRechazo, hojaDetalleTecho, hojaInforme, hojaDiagnostico, hojaCategorias,
   hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaSobrante,
+  hojaMovimiento, hojaImportar, hojaDetalles, hojaHistorial, hojaIntro,
 } from '../ui/hojas.js';
 
 const raiz = document.getElementById('app');
@@ -84,9 +85,17 @@ async function arrancar() {
 }
 
 async function refrescar() {
-  await comandos.asegurarPeriodos();
+  const cierres = await comandos.asegurarPeriodos();
   const instantanea = await comandos.instantanea();
   estado.set(instantanea);
+
+  // La compactacion va DESPUES del cierre y sin bloquear el render: el cierre
+  // tiene que terminar en milisegundos, comprimir dos años de historia no.
+  if (cierres.length) {
+    setTimeout(() => {
+      comandos.compactarMesesFrios().catch((e) => console.warn('compactación:', e?.message));
+    }, 2_000);
+  }
 }
 
 // =========================================================================
@@ -155,7 +164,8 @@ function render(s) {
         <button data-accion="modo" data-modo="ingreso" aria-pressed="${esIngreso}">Ingreso</button>
       </div>
 
-      ${visor(formatearEntrada(s.captura.digitos), pistaDeCaptura(s), s.captura.modo)}
+      ${visor(formatearEntrada(s.captura.digitos), pistaDeCaptura(s), s.captura.modo,
+              s.ajustes?.moneda, !esIngreso, s.captura)}
 
       ${esIngreso
         ? fichasIngreso(limpiarSeleccion(s.captura.bucketsIngreso), previoIngreso(s, centavos))
@@ -169,6 +179,7 @@ function render(s) {
     </div>`;
 
   capaHojas.innerHTML = s.hoja ? renderHoja(s) : '';
+  sincronizarFoco(s.hoja?.tipo ?? null);
   capaBrindis.innerHTML = s.brindis
     ? `<div class="brindis"><span>${esc(s.brindis.texto)}</span>
          ${s.brindis.movimientoId
@@ -191,6 +202,20 @@ function renderHoja(s) {
         captura: s.captura,
         importeTexto: s.captura.digitos ? `${s.ajustes?.moneda ?? 'R$'}${formatearEntrada(s.captura.digitos)}` : '',
       });
+    case 'intro':
+      return hojaIntro({
+        paso: h.paso ?? 0,
+        ingresoNormal: s.ajustes?.ingresoNormal?.montoCents ?? 0,
+        pesos: s.ajustes?.pesos,
+      });
+    case 'historial':
+      return hojaHistorial({ datos: h.datos, meses: h.meses, ajustes: s.ajustes });
+    case 'movimiento':
+      return hojaMovimiento({ ...h, ajustes: s.ajustes });
+    case 'importar':
+      return hojaImportar({ analisis: h.analisis, error: h.error });
+    case 'detalles':
+      return hojaDetalles({ captura: s.captura, periodo: s.periodo, fechaHoy: s.fecha });
     case 'sobrante':
       return hojaSobrante({
         pendiente: s.sobrantePendiente,
@@ -202,7 +227,11 @@ function renderHoja(s) {
     case 'detalle':
       return hojaDetalleTecho({ periodo: s.periodo, bucket: h.bucket, movimientos: s.ultimos, fecha: s.fecha });
     case 'informe':
-      return hojaInforme({ informe: h.informe ?? s.ultimoInforme, periodId: s.periodo.id });
+      return hojaInforme({
+        informe: h.informe ?? s.ultimoInforme,
+        periodId: s.periodo.id,
+        disponibles: h.disponibles ?? [],
+      });
     case 'diagnostico':
       return hojaDiagnostico({ dx: s.diagnostico });
     case 'categorias':
@@ -216,12 +245,50 @@ function renderHoja(s) {
   }
 }
 
+/**
+ * Foco de las hojas.
+ *
+ * Al abrir una hoja el foco tiene que entrar en ella, y al cerrarla volver a
+ * donde estaba. Sin esto, quien navegue con teclado o VoiceOver abre una hoja
+ * y sigue con el foco detras, tabulando por una pantalla que ya no ve.
+ *
+ * El enfoque ocurre solo cuando CAMBIA la hoja, no en cada repintado: la hoja
+ * se vuelve a dibujar con cada cambio de estado, y robar el foco cada vez
+ * expulsaria al usuario del campo que esta escribiendo.
+ */
+let focoPrevio = null;
+let tipoHojaVisible = null;
+
 function abrirHoja(hoja) {
+  if (!estado.get().hoja) focoPrevio = document.activeElement;
   estado.set({ hoja });
 }
 
 function cerrarHoja() {
+  correccionPendiente = null;
   estado.set({ hoja: null });
+  if (focoPrevio?.isConnected) focoPrevio.focus();
+  focoPrevio = null;
+}
+
+const ENFOCABLES = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+function enfocables() {
+  const hoja = capaHojas.querySelector('.hoja');
+  return hoja ? [...hoja.querySelectorAll(ENFOCABLES)].filter((e) => !e.disabled) : [];
+}
+
+function sincronizarFoco(tipo) {
+  if (tipo === tipoHojaVisible) return;
+  tipoHojaVisible = tipo;
+  if (!tipo) return;
+
+  const hoja = capaHojas.querySelector('.hoja');
+  if (!hoja) return;
+  // Si la hoja pide escribir algo, el foco va al campo; si no, al contenedor,
+  // que es lo que hace que el lector de pantalla lea el titulo.
+  const campo = hoja.querySelector('input, textarea, select');
+  (campo ?? hoja).focus({ preventScroll: true });
 }
 
 function brindar(texto, movimientoId = null) {
@@ -272,7 +339,7 @@ const acciones = {
     const siguiente = actual.includes(b) ? actual.filter((x) => x !== b) : [...actual, b];
     if (!siguiente.length) return; // desmarcar el ultimo no hace nada
     estado.set({ captura: { ...s.captura, bucketsIngreso: siguiente } });
-    vibrar(8);
+    destellarPulsado(el);
   },
 
   /**
@@ -288,14 +355,12 @@ const acciones = {
       estado.set({
         captura: { ...s.captura, bucket, destinoId: automatico.id, destinoTexto: null, categoryId: null },
       });
-      vibrar(8);
       return;
     }
 
     if (lista.length > 0) {
       estado.set({ captura: { ...s.captura, bucket, destinoId: null, destinoTexto: null, categoryId: null } });
       abrirHoja({ tipo: 'destinos', bucket });
-      vibrar(8);
       return;
     }
 
@@ -305,7 +370,6 @@ const acciones = {
       return;
     }
     estado.set({ captura: { ...s.captura, bucket, categoryId: categoriaPorDefecto(bucket) } });
-    vibrar(8);
   },
 
   'elegir-destino'(el, s) {
@@ -355,6 +419,16 @@ const acciones = {
   },
 
   async 'confirmar-importe'(_el, s) {
+    if (correccionPendiente) {
+      const { id, importeCents } = correccionPendiente;
+      correccionPendiente = null;
+      const r = await comandos.editarMovimiento(id, { importeCents, confirmado: true });
+      cerrarHoja();
+      if (!r.ok) { brindar('No se pudo corregir.'); return; }
+      await refrescar();
+      brindar(`Corregido a ${formatear(importeCents)}.`);
+      return;
+    }
     await guardar({ ...s.captura, confirmado: true });
   },
 
@@ -380,6 +454,123 @@ const acciones = {
     estado.set({ captura: { ...s.captura, [campo]: !s.captura[campo], nota: leerNota() } });
   },
 
+  // --- detalles opcionales del registro (UX-04, UX-05) -----------------
+
+  'ver-detalles'() {
+    abrirHoja({ tipo: 'detalles' });
+  },
+
+  'guardar-detalles'(_el, s) {
+    const nota = capaHojas.querySelector('[data-campo="nota"]')?.value ?? '';
+    const fecha = capaHojas.querySelector('[data-campo="fecha"]')?.value || null;
+    estado.set({ captura: { ...s.captura, nota: nota.trim(), localDate: fecha } });
+    cerrarHoja();
+  },
+
+  'limpiar-detalles'(_el, s) {
+    estado.set({ captura: { ...s.captura, nota: '', localDate: null } });
+    cerrarHoja();
+  },
+
+  // --- corregir un movimiento (UX-01) -----------------------------------
+
+  async 'ver-movimiento'(el) {
+    const encontrado = await comandos.movimiento(el.dataset.id);
+    if (!encontrado) return;
+    abrirHoja({ tipo: 'movimiento', ...encontrado });
+  },
+
+  async 'guardar-correccion'(el, s) {
+    const texto = capaHojas.querySelector('[data-campo="nuevoImporte"]')?.value ?? '';
+    const centavos = parsearCentavos(texto);
+    if (!(centavos > 0)) {
+      capaHojas.querySelector('.campo')?.classList.add('error');
+      return;
+    }
+    const r = await comandos.editarMovimiento(el.dataset.id, { importeCents: centavos });
+    if (!r.ok) {
+      if (r.veredicto) {
+        // Si la correccion trae otro importe raro, se pregunta igual que en un
+        // registro nuevo, y al confirmar se retoma por donde iba.
+        correccionPendiente = { id: el.dataset.id, importeCents: centavos };
+        abrirHoja({ tipo: 'rechazo', veredicto: r.veredicto, requiere: r.requiere });
+      } else {
+        brindar('No se pudo corregir.');
+      }
+      return;
+    }
+    correccionPendiente = null;
+    cerrarHoja();
+    await refrescar();
+    brindar(`Corregido a ${formatear(centavos)}.`);
+  },
+
+  async 'anular-movimiento'(el) {
+    const r = await comandos.anularMovimiento(el.dataset.id);
+    cerrarHoja();
+    if (!r.ok) { brindar('No se pudo anular.'); return; }
+    await refrescar();
+    brindar('Movimiento anulado.');
+  },
+
+  async 'corregir-en-abierto'(el, s) {
+    const encontrado = await comandos.movimiento(el.dataset.id);
+    cerrarHoja();
+    if (!encontrado) return;
+    const m = encontrado.movimiento;
+    estado.set({
+      captura: {
+        ...capturaVacia(),
+        modo: m.tipo === 'ingreso' ? 'ingreso' : 'gasto',
+        bucket: m.bucket,
+        categoryId: m.categoryId,
+        destinoId: m.destinoId,
+        destinoTexto: m.destinoTexto,
+        nota: `Corrección de ${m.localDate}`,
+      },
+    });
+    brindar('Teclea el importe de la corrección.');
+  },
+
+  // --- restaurar una copia (UX-03) --------------------------------------
+
+  'ver-importar'() {
+    abrirHoja({ tipo: 'importar' });
+  },
+
+  'elegir-copia'() {
+    const entrada = document.createElement('input');
+    entrada.type = 'file';
+    entrada.accept = 'application/json,.json';
+    entrada.addEventListener('change', async () => {
+      const archivo = entrada.files?.[0];
+      if (!archivo) return;
+      try {
+        const datos = JSON.parse(await archivo.text());
+        const analisis = await comandos.analizarCopia(datos);
+        if (!analisis.valido) {
+          abrirHoja({ tipo: 'importar', error: analisis.motivo });
+          return;
+        }
+        copiaPendiente = datos;
+        abrirHoja({ tipo: 'importar', analisis });
+      } catch (e) {
+        abrirHoja({ tipo: 'importar', error: 'No es un archivo JSON válido.' });
+      }
+    });
+    entrada.click();
+  },
+
+  async 'confirmar-restauracion'() {
+    if (!copiaPendiente) return;
+    const r = await comandos.restaurarCopia(copiaPendiente);
+    copiaPendiente = null;
+    cerrarHoja();
+    if (!r.ok) { brindar(r.motivo ?? 'No se pudo restaurar.'); return; }
+    await refrescar();
+    brindar(`Restaurados ${r.resumen.movimientos} movimientos de ${r.resumen.periodos} meses.`);
+  },
+
   async deshacer(el) {
     const r = await comandos.deshacer(el.dataset.id);
     estado.set({ brindis: null });
@@ -398,9 +589,8 @@ const acciones = {
       return;
     }
     await comandos.configurarIngresoNormal(centavos);
-    cerrarHoja();
     await refrescar();
-    brindar(`Listo. Cada día 1 entrarán ${formatear(centavos)}.`);
+    abrirHoja({ tipo: 'intro', paso: 0 });
   },
 
   async 'saltar-alta'() {
@@ -409,8 +599,24 @@ const acciones = {
       ...ajustes,
       ingresoNormal: { ...ajustes.ingresoNormal, configurado: true, montoCents: 0 },
     });
-    cerrarHoja();
     await refrescar();
+    abrirHoja({ tipo: 'intro', paso: 0 });
+  },
+
+  // --- introduccion (UX-10) ---------------------------------------------
+
+  'ver-intro'() {
+    abrirHoja({ tipo: 'intro', paso: 0 });
+  },
+
+  async 'intro-siguiente'(el) {
+    const paso = Number(el.dataset.paso);
+    if (paso >= 3) { cerrarHoja(); await refrescar(); return; }
+    abrirHoja({ tipo: 'intro', paso });
+  },
+
+  'intro-saltar'() {
+    cerrarHoja();
   },
 
   // --- hojas -----------------------------------------------------------
@@ -429,8 +635,24 @@ const acciones = {
     });
   },
 
+  // --- historial (UX-02) e informes por mes (UX-12) ---------------------
+
+  async 'ver-historial'(_el, s) {
+    await mostrarHistorial({ periodId: s.periodo.id });
+  },
+
+  async 'filtrar-techo'(el, s) {
+    const f = s.hoja?.datos?.filtro ?? {};
+    await mostrarHistorial({
+      periodId: s.hoja.datos.periodId,
+      bucket: el.dataset.bucket || null,
+      texto: capaHojas.querySelector('[data-campo="buscaHistorial"]')?.value ?? f.texto ?? '',
+    });
+  },
+
   async 'ver-informe'(_el, s) {
-    abrirHoja({ tipo: 'informe', informe: s.ultimoInforme });
+    const disponibles = (await repo.informes()).map((i) => i.periodId);
+    abrirHoja({ tipo: 'informe', informe: s.ultimoInforme, disponibles });
   },
 
   async 'ver-sobrante'() {
@@ -565,12 +787,38 @@ function leerNota() {
   return capaHojas.querySelector('[data-campo="nota"]')?.value ?? estado.get().captura.nota;
 }
 
-function vibrar(ms) {
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    /* no todos los dispositivos lo tienen */
-  }
+/** Abre o refresca el historial conservando el filtro. */
+async function mostrarHistorial(filtro) {
+  const datos = await comandos.historial(filtro);
+  const meses = await comandos.mesesDisponibles();
+  abrirHoja({ tipo: 'historial', datos, meses });
+}
+
+/** Copia a la espera de confirmacion en la hoja de restaurar. */
+let copiaPendiente = null;
+
+/** Correccion frenada por una regla, a la espera de que se confirme. */
+let correccionPendiente = null;
+
+/**
+ * Acuse de recibo visual.
+ *
+ * Aqui habia nueve llamadas a navigator.vibrate(). Safari en iOS no implementa
+ * esa API: no vibraba nada y nunca lo hizo. La confirmacion al tocar si aporta;
+ * lo que fallaba era el canal. Un destello corto sobre el propio elemento
+ * llega siempre y respeta prefers-reduced-motion desde el CSS.
+ */
+function destellar(el) {
+  if (!el) return;
+  el.classList.remove('destello');
+  void el.offsetWidth; // fuerza reinicio de la animacion si se repite rapido
+  el.classList.add('destello');
+  setTimeout(() => el.classList.remove('destello'), 320);
+}
+
+/** Destella el boton que se acaba de pulsar, sea cual sea. */
+function destellarPulsado(el) {
+  destellar(el);
 }
 
 /** Camino unico de guardado de gastos. */
@@ -601,6 +849,7 @@ async function guardar(captura) {
     comercioTipo: captura.comercioTipo,
     aceptaForzado: captura.forzado,
     confirmado: captura.confirmado,
+    localDate: captura.localDate ?? undefined,
   };
 
   const r = await comandos.registrarGasto(cmd);
@@ -614,11 +863,8 @@ async function guardar(captura) {
   if (!r.ok) {
     estado.set({ captura: { ...captura, nota, razonReserva: razon } });
     abrirHoja({ tipo: 'rechazo', veredicto: r.veredicto, sugerencia: r.sugerencia, requiere: r.requiere });
-    vibrar([12, 60, 12]);
     return;
   }
-
-  vibrar(14);
   estado.set({ captura: capturaVacia(), hoja: null });
   await refrescar();
 
@@ -640,8 +886,6 @@ async function guardarIngreso(centavos, buckets) {
     brindar(r.veredicto?.mensaje ?? 'No se pudo registrar.');
     return;
   }
-
-  vibrar(14);
   estado.set({
     captura: { ...capturaVacia(), modo: 'ingreso', bucketsIngreso: limpiarSeleccion(buckets) },
     hoja: null,
@@ -689,7 +933,6 @@ document.addEventListener('pointerdown', (evento) => {
     const bucket = ficha.dataset.bucket;
     estado.set({ captura: { ...s.captura, bucket } });
     abrirHoja({ tipo: destinosDe(s.ajustes, bucket).length ? 'destinos' : 'categorias', bucket });
-    vibrar(18);
   }, 480);
 });
 document.addEventListener('pointerup', () => clearTimeout(temporizadorLargo));
@@ -710,6 +953,63 @@ document.addEventListener('keydown', (evento) => {
   } else if (evento.key === 'Escape') {
     cerrarHoja();
   }
+});
+
+// Trampa de tabulador: con una hoja abierta, el foco no se va por detras.
+document.addEventListener('keydown', (evento) => {
+  if (evento.key !== 'Tab' || !estado.get().hoja) return;
+  const lista = enfocables();
+  if (!lista.length) return;
+
+  const primero = lista[0];
+  const ultimo = lista[lista.length - 1];
+  const dentro = capaHojas.contains(document.activeElement);
+
+  if (!dentro) {
+    evento.preventDefault();
+    (evento.shiftKey ? ultimo : primero).focus();
+  } else if (evento.shiftKey && document.activeElement === primero) {
+    evento.preventDefault();
+    ultimo.focus();
+  } else if (!evento.shiftKey && document.activeElement === ultimo) {
+    evento.preventDefault();
+    primero.focus();
+  }
+});
+
+// Los selectores y el buscador de las hojas viven fuera de la delegacion por
+// click: escuchan cambios y entrada de texto sobre la capa de hojas.
+capaHojas.addEventListener('change', async (evento) => {
+  const campo = evento.target.dataset?.campo;
+  if (campo === 'mesHistorial') {
+    const s = estado.get();
+    await mostrarHistorial({
+      periodId: evento.target.value,
+      bucket: s.hoja?.datos?.filtro?.bucket ?? null,
+      texto: capaHojas.querySelector('[data-campo="buscaHistorial"]')?.value ?? '',
+    });
+  } else if (campo === 'mesInforme') {
+    const informe = await repo.informe(evento.target.value);
+    const disponibles = (await repo.informes()).map((i) => i.periodId);
+    abrirHoja({ tipo: 'informe', informe, disponibles });
+  }
+});
+
+let tecleoHistorial = null;
+capaHojas.addEventListener('input', (evento) => {
+  if (evento.target.dataset?.campo !== 'buscaHistorial') return;
+  clearTimeout(tecleoHistorial);
+  const texto = evento.target.value;
+  // Se espera a que pare de teclear: repintar en cada letra pierde el foco.
+  tecleoHistorial = setTimeout(async () => {
+    const s = estado.get();
+    await mostrarHistorial({
+      periodId: s.hoja?.datos?.periodId,
+      bucket: s.hoja?.datos?.filtro?.bucket ?? null,
+      texto,
+    });
+    capaHojas.querySelector('[data-campo="buscaHistorial"]')?.focus();
+  }, 320);
 });
 
 estado.suscribir(render);

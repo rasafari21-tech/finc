@@ -49,7 +49,15 @@ export function barraTecho(periodo, bucket, fechaHoy) {
 }
 
 export function panelTechos(periodo, fechaHoy) {
-  return `<div class="techos">${ORDEN.map((b) => barraTecho(periodo, b, fechaHoy)).join('')}</div>`;
+  const sinTechos = ORDEN.every((b) => (periodo.techos[b] ?? 0) === 0);
+  return `
+    <div class="techos">${ORDEN.map((b) => barraTecho(periodo, b, fechaHoy)).join('')}</div>
+    ${sinTechos
+      ? `<p class="vacio" style="padding:10px 4px 14px;font-size:13.5px">
+           Los techos están a cero porque este mes no ha entrado dinero todavía.<br>
+           Registra un ingreso, o pon tu ingreso mensual en Ajustes para que entre solo cada día 1.
+         </p>`
+      : ''}`;
 }
 
 /** Teclado numerico propio: aparece al instante y no ofrece caracteres invalidos. */
@@ -99,26 +107,43 @@ export function fichasIngreso(seleccionadas, reparto) {
 }
 
 /** Visor del importe, con el texto de ayuda contextual debajo. */
-export function visor(digitos, pista, modo, moneda = MONEDA) {
+export function visor(digitos, pista, modo, moneda = MONEDA, conDetalles = false, captura = null) {
   const texto = digitos === '' ? '0' : digitos;
+  const hayNota = Boolean(captura?.nota?.trim());
+  const otraFecha = Boolean(captura?.localDate);
+  const marcado = hayNota || otraFecha;
+
   return `
     <div class="visor">
-      <span class="importe ${digitos === '' ? 'vacio' : ''}">${modo === 'ingreso' ? '+' : ''}${esc(moneda)}${esc(texto)}</span>
-      <span class="pista-txt">${esc(pista ?? '')}</span>
+      ${conDetalles
+        ? `<button class="detalles ${marcado ? 'puesto' : ''}" data-accion="ver-detalles"
+                   aria-label="Nota y fecha del gasto">
+             ${otraFecha ? esc(captura.localDate.slice(8)) + '/' + esc(captura.localDate.slice(5, 7)) : '✎'}
+             ${hayNota ? '<span class="punto" aria-hidden="true"></span>' : ''}
+           </button>`
+        : ''}
+      <span class="cifra-visor">
+        <span class="importe ${digitos === '' ? 'vacio' : ''}">${modo === 'ingreso' ? '+' : ''}${esc(moneda)}${esc(texto)}</span>
+        <span class="pista-txt">${esc(pista ?? '')}</span>
+      </span>
     </div>`;
 }
 
-export function filaMovimiento(mov, categorias) {
+export function filaMovimiento(mov, categorias, tocable = false) {
   const cat = categorias?.[mov.categoryId]?.nombre ?? (mov.tipo === 'ingreso' ? 'Ingreso' : 'Sin categoría');
   const signo = mov.tipo === 'ingreso' ? 'pos' : '';
+  const etiqueta = tocable ? 'button' : 'div';
+  const atributos = tocable
+    ? ` data-accion="ver-movimiento" data-id="${esc(mov.id)}" class="fila tocable"`
+    : ' class="fila"';
   return `
-    <div class="fila">
+    <${etiqueta}${atributos}>
       <span class="t">${esc(cat)}</span>
       <span class="v ${signo}">${mov.tipo === 'ingreso' ? '+' : ''}${formatear(mov.importeCents)}</span>
       <span class="s">${esc(mov.localDate)} · ${esc(ETIQUETAS[mov.bucket] ?? (mov.tipo === 'ingreso' ? 'repartido' : '—'))}${
         mov.nota ? ` · ${esc(mov.nota.slice(0, 40))}` : ''
       }</span>
-    </div>`;
+    </${etiqueta}>`;
 }
 
 export function cabecera(periodo, estado) {
@@ -133,6 +158,7 @@ export function cabecera(periodo, estado) {
         <span class="sub">día ${dia} de ${dias}</span>
       </span>
       <span class="iconos">
+        <button class="icono" data-accion="ver-historial" aria-label="Movimientos">☰</button>
         <button class="icono" data-accion="ver-informe" aria-label="Informe de cierre">▤</button>
         <button class="icono ${hayAlerta ? 'alerta' : ''}" data-accion="ver-sobrante" aria-label="Lo que te sobra">◈</button>
         <button class="icono" data-accion="ver-ajustes" aria-label="Ajustes">⚙</button>

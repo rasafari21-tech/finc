@@ -230,6 +230,17 @@ export function crearRepo(motor, boveda) {
       return a.informe ?? null;
     },
 
+    /** El registro completo de archives, no solo su informe. */
+    async archivo(periodId) {
+      const crudo = await motor.obtener('archives', periodId);
+      return crudo ? abrir('archives', crudo) : null;
+    },
+
+    async guardarArchivo(registro) {
+      await motor.guardar('archives', await sellar('archives', registro));
+      return registro;
+    },
+
     async informes() {
       const crudos = await motor.todos('archives');
       const abiertos = await abrirVarios('archives', crudos);

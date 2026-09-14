@@ -18,10 +18,21 @@
 <!-- iOS usa este para la pantalla de inicio y le aplica su propia máscara
      redondeada, así que la imagen va a sangre, sin esquinas ni transparencia. -->
 <link rel="apple-touch-icon" href="./iconos/icono-180.png?v=2">
+
+<!-- Pantallas de arranque: sin ellas iOS enseña blanco hasta que la app pinta.
+     Las genera tools/iconos.py desde el mismo maestro del icono. -->
+<link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="./iconos/arranque-1290x2796.png"><!-- iPhone 15/16 Pro Max -->
+<link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="./iconos/arranque-1179x2556.png"><!-- iPhone 15/16 -->
+<link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="./iconos/arranque-1284x2778.png"><!-- iPhone 13/14 Pro Max -->
+<link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="./iconos/arranque-1170x2532.png"><!-- iPhone 13/14 -->
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="./iconos/arranque-1125x2436.png"><!-- iPhone X/XS/11 Pro -->
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" href="./iconos/arranque-1242x2688.png"><!-- iPhone XS Max/11 Pro Max -->
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="./iconos/arranque-828x1792.png"><!-- iPhone XR/11 -->
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="./iconos/arranque-750x1334.png"><!-- iPhone SE -->
 <link rel="icon" type="image/png" sizes="192x192" href="./iconos/icono-192.png?v=2">
 <link rel="icon" type="image/png" sizes="512x512" href="./iconos/icono-512.png?v=2">
 
-<link rel="stylesheet" href="./estilos/app.css?v=7">
+<link rel="stylesheet" href="./estilos/app.css?v=8">
 </head>
 <body>
 
@@ -36,6 +47,6 @@
   </div>
 </noscript>
 
-<script type="module" src="./src/app/main.js?v=7"></script>
+<script type="module" src="./src/app/main.js?v=8"></script>
 </body>
 </html>

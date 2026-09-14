@@ -14,8 +14,26 @@ import { REGLAS_NUCLEO } from '../dominio/reglas.js';
 import { etiquetaDestino } from '../dominio/carry.js';
 import { porcentaje } from '../dominio/dinero.js';
 
-const envolver = (contenido) => `<div class="velo" data-accion="cerrar-hoja"><div class="hoja" data-parar>
-  <div class="asa"></div>${contenido}</div></div>`;
+/**
+ * Envoltorio comun de todas las hojas.
+ *
+ * Aqui vive la semantica de dialogo, y por eso esta en un solo sitio: las diez
+ * hojas la heredan y cualquiera nueva tambien. Sin esto, abrir una hoja no
+ * anunciaba nada a un lector de pantalla y el foco se quedaba detras.
+ *
+ * El id del titulo se genera al vuelo y se engancha al primer <h2>, que todas
+ * tienen, para que aria-labelledby apunte a algo real.
+ */
+let contadorHojas = 0;
+
+const envolver = (contenido) => {
+  const idTitulo = `hoja-tit-${++contadorHojas}`;
+  const conId = contenido.replace('<h2', `<h2 id="${idTitulo}"`);
+  return `<div class="velo" data-accion="cerrar-hoja">
+    <div class="hoja" data-parar role="dialog" aria-modal="true" aria-labelledby="${idTitulo}" tabindex="-1">
+      <div class="asa" aria-hidden="true"></div>${conId}
+    </div></div>`;
+};
 
 /**
  * Hoja de rechazo. Nunca es un aviso que se desvanece: el usuario debe
@@ -184,20 +202,34 @@ export function hojaDetalleTecho({ periodo, bucket, movimientos, fecha }) {
       .join('')}</div>` : ''}
 
     ${delBucket.length
-      ? `<h3>Últimos movimientos</h3><div class="lista">${delBucket.map((m) => filaMovimiento(m, CATEGORIAS)).join('')}</div>`
-      : '<p class="vacio">Todavía no hay movimientos en este techo.</p>'}
+      ? `<h3>Últimos movimientos</h3>
+         <p style="font-size:12.5px;margin:-4px 0 8px">Toca cualquiera para corregirlo o anularlo.</p>
+         <div class="lista">${delBucket.map((m) => filaMovimiento(m, CATEGORIAS, true)).join('')}</div>`
+      : '<p class="vacio">Todavía no hay movimientos en este techo.<br>Aparecerán aquí en cuanto registres el primero.</p>'}
 
     <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cerrar</button></div>`);
 }
 
 /** Informe de cierre archivado. */
-export function hojaInforme({ informe, periodId }) {
+export function hojaInforme({ informe, periodId, disponibles = [] }) {
   if (!informe) {
     return envolver(`
       <h2>Aún no hay informes</h2>
-      <p>El primero se genera automáticamente cuando termine el mes en curso. No tienes que hacer nada.</p>
+      <p>El primero se genera solo cuando termine el mes en curso: archiva lo gastado en cada
+      techo, manda a tu Fondo lo que no usaste de Reserva y calcula lo que te sobró.</p>
+      <p>No tienes que hacer nada. Basta con abrir la app algún día después del 1.</p>
       <div class="botones"><button class="btn" data-accion="cerrar-hoja">Entendido</button></div>`);
   }
+
+  // Selector de mes: los informes estan todos guardados en archives, solo que
+  // hasta ahora no habia forma de llegar a ninguno salvo al ultimo.
+  const selector = disponibles.length > 1
+    ? `<div class="filtros" style="margin-bottom:16px">
+         <select data-campo="mesInforme" aria-label="Mes del informe">
+           ${disponibles.map((m) => `<option value="${m}" ${m === informe.periodId ? 'selected' : ''}>${esc(nombrePeriodo(m))}</option>`).join('')}
+         </select>
+       </div>`
+    : '';
 
   const buckets = informe.porBucket
     .map((b) => {
@@ -237,6 +269,7 @@ export function hojaInforme({ informe, periodId }) {
 
   return envolver(`
     <h2>${esc(nombrePeriodo(informe.periodId ?? periodId))}</h2>
+    ${selector}
     <div class="lista">
       <div class="fila"><span class="t">Ingresado</span><span class="v pos">${formatear(informe.ingresoTotal)}</span></div>
       <div class="fila"><span class="t">Gastado</span><span class="v">${formatear(informe.gastoTotal)}</span></div>
@@ -252,6 +285,15 @@ export function hojaInforme({ informe, periodId }) {
     <div class="lista">${buckets}</div>
     ${cobros}
     ${choques}
+
+    <div class="aviso" style="margin:20px 0 0">
+      <strong>Buen momento para una copia.</strong>
+      El mes está cerrado y no hay sincronización: este teléfono es el único sitio
+      donde viven tus datos.
+      <div class="acciones">
+        <button class="principal" data-accion="exportar">Exportar copia</button>
+      </div>
+    </div>
 
     <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cerrar</button></div>`);
 }
@@ -396,8 +438,20 @@ export function hojaAjustes({ ajustes, estadisticas, boveda }) {
       <div class="fila"><span class="t">Meses</span><span class="v">${estadisticas.periodos}</span></div>
     </div>
 
+    <h3>Cómo funciona</h3>
+    <div class="botones" style="margin-top:0">
+      <button class="btn" data-accion="ver-intro">Volver a ver la explicación</button>
+    </div>
+
+    <h3>Copias de seguridad</h3>
+    <p style="font-size:13px">No hay sincronización: este teléfono es el único sitio donde viven tus
+    datos. Exporta de vez en cuando; el archivo se puede volver a cargar aquí mismo.</p>
+    <div class="botones" style="margin-top:0">
+      <button class="btn" data-accion="exportar">Exportar una copia</button>
+      <button class="btn" data-accion="ver-importar">Restaurar una copia…</button>
+    </div>
+
     <div class="botones">
-      <button class="btn" data-accion="exportar">Exportar copia</button>
       <button class="btn" data-accion="cerrar-hoja">Cerrar</button>
       <button class="btn peligro" data-accion="borrar-todo">Borrar todo</button>
     </div>`);
@@ -435,8 +489,10 @@ export function hojaFondos({ fondos, entradasAhorro, entradasCartera }) {
  * Sustituye al PIN y al anclaje mensual de saldo.
  */
 export function hojaAlta({ moneda = 'R$' }) {
-  return `<div class="velo" style="align-items:center"><div class="hoja" data-parar style="border-radius:18px;margin:0 14px;max-width:420px">
-    <h2 style="margin-top:10px">¿Cuánto ingresas al mes?</h2>
+  return `<div class="velo" style="align-items:center">
+    <div class="hoja" data-parar role="dialog" aria-modal="true" aria-labelledby="alta-tit"
+         tabindex="-1" style="border-radius:18px;margin:0 14px;max-width:420px">
+    <h2 id="alta-tit" style="margin-top:10px">¿Cuánto ingresas al mes?</h2>
     <p>Lo pregunto una vez. A partir de ahí entra solo cada día 1 y se reparte en tus cuatro techos. No tendrás que teclear el saldo nunca más.</p>
     <div class="campo">
       <label for="alta-ingreso">Tu ingreso mensual normal</label>
@@ -564,7 +620,9 @@ export function hojaSobrante({ pendiente, sobranteActual, historial, media, fond
           )
           .join('')}</div>
          ${media > 0 ? `<p style="font-size:12.5px;margin-top:10px">De media te sobran ${formatear(media)} al mes.</p>` : ''}`
-      : '<p class="vacio">Todavía no hay meses cerrados. El primer sobrante se calcula al acabar este mes.</p>'}
+      : `<p class="vacio">Todavía no hay meses cerrados.<br>
+           El primer sobrante se calcula solo al acabar este mes: será lo que no gastes
+           de Esenciales y Recompensas.</p>`}
 
     <p style="font-size:11.5px;color:var(--tinta-3);margin-top:14px">
       El sobrante de un mes no cambia aunque después lo inviertas: es lo que pasó ese mes.
@@ -576,6 +634,270 @@ export function hojaSobrante({ pendiente, sobranteActual, historial, media, fond
 function etiquetaSobrante(destino) {
   const d = DESTINOS_SOBRANTE.find((x) => x.id === destino);
   return d ? d.nombre : destino;
+}
+
+
+/**
+ * Un movimiento, con las salidas para corregirlo (UX-01).
+ *
+ * En el mes abierto se puede cambiar el importe o anularlo. En un mes cerrado
+ * no: el archivo es inmutable, asi que lo unico que se ofrece es anotar la
+ * correccion en el mes en curso, que es lo que pide R-18.
+ */
+export function hojaMovimiento({ movimiento, editable, ajustes, borrador }) {
+  const m = movimiento;
+  const cat = CATEGORIAS[m.categoryId]?.nombre;
+  const destino = etiquetaDeDestino(m, ajustes);
+  const esIngreso = m.tipo === 'ingreso';
+
+  return envolver(`
+    <h2>${esIngreso ? 'Ingreso' : 'Gasto'} de ${formatear(m.importeCents)}</h2>
+
+    <div class="lista">
+      <div class="fila"><span class="t">Fecha</span><span class="v">${esc(m.localDate)}</span></div>
+      ${m.bucket ? `<div class="fila"><span class="t">Techo</span><span class="v">${esc(ETIQUETAS[m.bucket] ?? m.bucket)}</span></div>` : ''}
+      ${destino ? `<div class="fila"><span class="t">Destino</span><span class="v">${esc(destino)}</span></div>` : ''}
+      ${cat ? `<div class="fila"><span class="t">Categoría</span><span class="v">${esc(cat)}</span></div>` : ''}
+      ${m.nota ? `<div class="fila"><span class="t">Nota</span><span class="v" style="font-weight:400;text-align:left">${esc(m.nota)}</span></div>` : ''}
+      ${m.bucketOriginal ? `<div class="fila"><span class="t">Lo intentaste en</span><span class="v">${esc(ETIQUETAS[m.bucketOriginal])}</span>
+        <span class="s">una regla lo movió</span></div>` : ''}
+    </div>
+
+    ${editable
+      ? `<h3>Corregir el importe</h3>
+         <div class="campo">
+           <label for="nuevo-importe">Cuánto era en realidad</label>
+           <input id="nuevo-importe" type="text" inputmode="decimal" data-campo="nuevoImporte"
+                  value="${esc(borrador ?? formatear(m.importeCents).replace(/^\D+/, ''))}" autocomplete="off">
+         </div>
+         <div class="botones" style="margin-top:0">
+           <button class="btn principal" data-accion="guardar-correccion" data-id="${esc(m.id)}">Guardar el nuevo importe</button>
+           <button class="btn peligro" data-accion="anular-movimiento" data-id="${esc(m.id)}">Anular este movimiento</button>
+           <button class="btn" data-accion="cerrar-hoja">Dejarlo como está</button>
+         </div>`
+      : `<div class="aviso" style="margin:16px 0 0">
+           <strong>Ese mes ya está cerrado.</strong>
+           El archivo no se toca: es lo que hace que el histórico cuadre. Puedes anotar la
+           corrección en el mes en curso.
+         </div>
+         <div class="botones">
+           <button class="btn principal" data-accion="corregir-en-abierto" data-id="${esc(m.id)}">Anotar corrección en el mes abierto</button>
+           <button class="btn" data-accion="cerrar-hoja">Cerrar</button>
+         </div>`}`);
+}
+
+function etiquetaDeDestino(m, ajustes) {
+  if (!m?.destinoId) return null;
+  if (m.destinoTexto) return m.destinoTexto;
+  return destinosDe(ajustes, m.bucket).find((d) => d.id === m.destinoId)?.nombre ?? m.destinoId;
+}
+
+/**
+ * Restaurar una copia (UX-03).
+ *
+ * Sustituye todo lo que hay, asi que primero se enseña que trae el archivo y
+ * que se va a perder. Nadie deberia pulsar esto sin ver las dos columnas.
+ */
+export function hojaImportar({ analisis, error }) {
+  if (!analisis) {
+    return envolver(`
+      <h2>Restaurar una copia</h2>
+      <p>Sustituye <strong>todo</strong> lo que hay en este teléfono por lo que traiga el archivo.
+      Antes de nada te enseño qué contiene y qué se pierde.</p>
+      ${error ? `<div class="aviso rojo" style="margin:0 0 14px"><strong>No pude leer ese archivo.</strong> ${esc(error)}</div>` : ''}
+      <div class="botones">
+        <button class="btn principal" data-accion="elegir-copia">Elegir archivo…</button>
+        <button class="btn" data-accion="cerrar-hoja">Cancelar</button>
+      </div>`);
+  }
+
+  const e = analisis.entrante;
+  const a = analisis.actual;
+  return envolver(`
+    <h2>¿Restauro esta copia?</h2>
+    <p>Lo de la izquierda desaparece. Lo de la derecha ocupa su lugar.</p>
+
+    <div class="lista">
+      <div class="fila"><span class="t">Meses</span>
+        <span class="v"><span class="neg">${a.periodos}</span> → <span class="pos">${e.periodos}</span></span></div>
+      <div class="fila"><span class="t">Movimientos</span>
+        <span class="v"><span class="neg">${a.movimientos}</span> → <span class="pos">${e.movimientos}</span></span></div>
+      ${e.primerMes ? `<div class="fila"><span class="t">Periodo de la copia</span>
+        <span class="v">${esc(nombrePeriodo(e.primerMes))} – ${esc(nombrePeriodo(e.ultimoMes))}</span></div>` : ''}
+      ${e.informes ? `<div class="fila"><span class="t">Informes archivados</span><span class="v">${e.informes}</span></div>` : ''}
+      ${e.sobrantes ? `<div class="fila"><span class="t">Sobrantes</span><span class="v">${e.sobrantes}</span></div>` : ''}
+    </div>
+
+    <div class="aviso rojo" style="margin:16px 0 0">
+      <strong>No hay vuelta atrás.</strong>
+      Si lo de este teléfono te importa, expórtalo antes de restaurar.
+    </div>
+
+    <div class="botones">
+      <button class="btn peligro" data-accion="confirmar-restauracion">Sí, restaurar y perder lo actual</button>
+      <button class="btn" data-accion="exportar">Exportar lo de ahora primero</button>
+      <button class="btn" data-accion="cerrar-hoja">Cancelar</button>
+    </div>`);
+}
+
+/**
+ * Detalles opcionales del registro: nota libre y fecha (UX-04, UX-05).
+ *
+ * Fuera del camino rapido a proposito. Quien registre y siga no la ve nunca;
+ * quien quiera explicar algo o anotar lo del domingo, la abre.
+ */
+export function hojaDetalles({ captura, periodo, fechaHoy }) {
+  const primerDia = `${periodo.id}-01`;
+  const ultimoDia = `${periodo.id}-${String(diasEnPeriodo(periodo.id)).padStart(2, '0')}`;
+  const tope = fechaHoy < ultimoDia ? fechaHoy : ultimoDia;
+
+  return envolver(`
+    <h2>Detalles</h2>
+    <p>Los dos son opcionales. Sin tocarlos, el gasto se anota hoy y sin nota.</p>
+
+    <div class="campo">
+      <label for="det-nota">Nota</label>
+      <textarea id="det-nota" data-campo="nota"
+                placeholder="Para acordarte dentro de tres meses">${esc(captura?.nota ?? '')}</textarea>
+      <span class="ayuda">Libre. Aparece en el historial y al abrir el movimiento.</span>
+    </div>
+
+    <div class="campo">
+      <label for="det-fecha">Fecha</label>
+      <input id="det-fecha" type="date" data-campo="fecha"
+             value="${esc(captura?.localDate ?? fechaHoy)}"
+             min="${esc(primerDia)}" max="${esc(tope)}">
+      <span class="ayuda">Solo dentro del mes abierto: los meses cerrados no se tocan.</span>
+    </div>
+
+    <div class="botones">
+      <button class="btn principal" data-accion="guardar-detalles">Aplicar</button>
+      <button class="btn" data-accion="limpiar-detalles">Quitar nota y volver a hoy</button>
+    </div>`);
+}
+
+
+/**
+ * Historial de movimientos (UX-02).
+ *
+ * Agrupado por dia porque asi se recuerda el gasto: «el martes» antes que «el
+ * 11 de septiembre». Cada fila abre el movimiento, que es desde donde se
+ * corrige.
+ */
+export function hojaHistorial({ datos, meses, ajustes }) {
+  const nombreDia = (fecha) => {
+    const [a, m, d] = fecha.split('-').map(Number);
+    const semana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    return `${semana[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]} ${d}`;
+  };
+
+  const filtros = `
+    <div class="filtros">
+      <select data-campo="mesHistorial" aria-label="Mes">
+        ${meses.map((m) => `<option value="${m}" ${m === datos.periodId ? 'selected' : ''}>${esc(nombrePeriodo(m))}</option>`).join('')}
+      </select>
+      <input type="search" data-campo="buscaHistorial" placeholder="Buscar nota o destino…"
+             value="${esc(datos.filtro.texto)}" aria-label="Buscar">
+    </div>
+    <div class="etiquetas" style="margin-bottom:16px">
+      <button data-accion="filtrar-techo" data-bucket="" aria-pressed="${!datos.filtro.bucket}">Todos</button>
+      ${ORDEN.map((b) => `<button data-accion="filtrar-techo" data-bucket="${b}"
+            aria-pressed="${datos.filtro.bucket === b}">${esc(ETIQUETAS[b])}</button>`).join('')}
+    </div>`;
+
+  const cuerpo = datos.dias.length
+    ? datos.dias.map((d) => `
+        <div class="dia">
+          <div class="dia-cab">
+            <span class="dia-nom">${esc(nombreDia(d.fecha))}</span>
+            <span class="dia-tot">
+              ${d.gastado ? `−${formatear(d.gastado)}` : ''}
+              ${d.ingresado ? `<span class="pos">+${formatear(d.ingresado)}</span>` : ''}
+            </span>
+          </div>
+          <div class="lista">${d.movimientos.map((m) => filaMovimiento(m, CATEGORIAS, true)).join('')}</div>
+        </div>`).join('')
+    : `<p class="vacio">${datos.filtro.texto || datos.filtro.bucket
+        ? 'Nada coincide con ese filtro.'
+        : 'Este mes todavía no tiene movimientos.<br>Aparecerán aquí en cuanto registres el primero.'}</p>`;
+
+  return envolver(`
+    <h2>Movimientos</h2>
+    ${filtros}
+    ${cuerpo}
+    ${datos.hayMas ? '<p style="font-size:12.5px;text-align:center">Se muestran los 120 más recientes.</p>' : ''}
+    <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cerrar</button></div>`);
+}
+
+
+/**
+ * Introduccion en tres tarjetas (UX-10).
+ *
+ * Sin esto, la primera vez que una regla rechaza algo la reaccion razonable es
+ * pensar que la app esta rota: nadie ha explicado nunca que hay un motor de
+ * reglas, ni que el dia 1 va a pasar algo solo. Se enseña una vez, es
+ * saltable, y queda accesible desde Ajustes.
+ *
+ * Usa las cifras de quien la lee, no ejemplos inventados.
+ */
+export function hojaIntro({ paso = 0, ingresoNormal = 0, pesos }) {
+  const p = pesos ?? { ESENCIALES: 5000, INVERSION: 2500, RESERVA: 1500, RECOMPENSAS: 1000 };
+  const parte = (b) => formatear(Math.round((ingresoNormal * p[b]) / 10_000));
+
+  const pasos = [
+    {
+      titulo: 'Tu mes se parte en cuatro',
+      cuerpo: ingresoNormal > 0
+        ? `<p>Cada día 1 entran tus ${formatear(ingresoNormal)} y se reparten solos:</p>
+           <div class="lista">
+             ${ORDEN.map((b) => `<div class="fila"><span class="t">${esc(ETIQUETAS[b])}</span>
+                <span class="v">${parte(b)}</span><span class="s">${p[b] / 100} %</span></div>`).join('')}
+           </div>
+           <p>Eso son tus <strong>techos</strong>. Cada gasto consume el suyo, y la barra te dice
+           cuánto queda sin tener que sumar nada.</p>`
+        : `<p>El dinero del mes se reparte en cuatro techos: Esenciales, Inversión, Reserva y
+           Recompensas. Cada gasto consume el suyo, y la barra te dice cuánto queda.</p>`,
+    },
+    {
+      titulo: 'A veces te va a decir que no',
+      cuerpo: `<p>Hay dieciocho reglas que impiden colar un gasto donde no toca. Un regalo no
+        entra en Esenciales por mucho que lo intentes: va a Recompensas, aunque sea para otra
+        persona.</p>
+        <p>No es para fastidiar. Un presupuesto no se rompe por el importe, se rompe por la
+        etiqueta: basta llamar «esencial» a lo que no lo es para que las cuentas cuadren en el
+        papel y no en el banco.</p>
+        <p><strong>Nunca bloquea un gasto que ya ocurrió</strong>, solo la etiqueta que le pones.
+        Si te pasas del techo, lo registra igual y lo pinta en rojo.</p>`,
+    },
+    {
+      titulo: 'El día 1 pasa solo',
+      cuerpo: `<p>Al abrir la app el día 1 —o el 7, da igual— se cierra el mes anterior sin que
+        hagas nada: archiva el informe, manda a tu Fondo de Ahorro lo que no gastaste de Reserva
+        y pone los cuatro techos a cero.</p>
+        <p>También calcula <strong>lo que te sobró</strong> de Esenciales y Recompensas, y te
+        pregunta qué hacer con ello. Esa cifra queda en el historial y ya no cambia, hagas lo
+        que hagas después con el dinero.</p>`,
+    },
+  ];
+
+  const actual = pasos[Math.min(paso, pasos.length - 1)];
+  const ultimo = paso >= pasos.length - 1;
+
+  return envolver(`
+    <h2>${esc(actual.titulo)}</h2>
+    ${actual.cuerpo}
+    <div class="puntos-intro" aria-hidden="true">
+      ${pasos.map((_, i) => `<span class="${i === paso ? 'activo' : ''}"></span>`).join('')}
+    </div>
+    <div class="botones">
+      <button class="btn principal" data-accion="intro-siguiente" data-paso="${paso + 1}">
+        ${ultimo ? 'Empezar' : 'Siguiente'}
+      </button>
+      ${ultimo ? '' : '<button class="btn" data-accion="intro-saltar">Saltar</button>'}
+    </div>
+    <p style="font-size:11.5px;color:var(--tinta-3);text-align:center;margin:14px 0 0">
+      ${paso + 1} de ${pasos.length} · lo tienes otra vez en Ajustes
+    </p>`);
 }
 
 export { envolver };
