@@ -153,7 +153,7 @@ export function cabecera(periodo, estado) {
 
   return `
     <header class="cabecera">
-      <span>
+      <span class="titulo">
         <span class="periodo">${esc(nombrePeriodo(periodo.id))}</span>
         <span class="sub">día ${dia} de ${dias}</span>
       </span>

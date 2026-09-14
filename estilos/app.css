@@ -28,6 +28,28 @@
   --radio: 10px;
   --seguro-inf: env(safe-area-inset-bottom, 0px);
   --seguro-sup: env(safe-area-inset-top, 0px);
+
+  /* iOS difumina progresivamente el contenido pegado a los bordes de la
+     pantalla: por debajo de la barra de estado y por encima del indicador de
+     inicio. No es un efecto que la pagina pueda desactivar.
+
+     Medido sobre una captura nativa de un 13 Pro Max (1284x2778), tomando como
+     nitidez el mayor salto de brillo entre pixeles vecinos de cada fila:
+
+       borde superior   texto a  67 px ->  73     texto a 115 px -> 209
+       borde inferior   texto a  53 px ->  66     texto a 114 px -> 227
+
+     O sea que el difuminado se apaga alrededor de `inset + 70 px`. Reservamos
+     esa franja: el sistema va a seguir difuminandola, pero difuminar papel
+     liso no se ve. Es la unica forma estructural de arreglarlo.
+
+     El clamp() hace de interruptor. Si no hay area segura no hay barras de
+     sistema —escritorio, prueba.html— y no hay nada que reservar: `x * 999`
+     vale 0 y el clamp devuelve el minimo. En cuanto el inset es distinto de
+     cero, se desborda hasta el maximo. Ningun iPhone en vertical pasa de
+     62 px de inset, asi que estos topes siempre lo cubren. */
+  --borde-sup: clamp(10px, calc(var(--seguro-sup) * 999), 100px);
+  --borde-inf: clamp(10px, calc(var(--seguro-inf) * 999), 100px);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -62,7 +84,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   height: 100dvh;
   max-width: 560px;
   margin: 0 auto;
-  padding-top: var(--seguro-sup);
+  padding-top: var(--borde-sup);
 }
 
 .cabecera {
@@ -73,8 +95,12 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   gap: 10px;
   padding: 10px 16px 6px;
 }
-.cabecera .periodo { font-weight: 600; font-size: 15px; }
-.cabecera .sub { font-size: 12px; color: var(--tinta-3); }
+.cabecera .titulo { display: flex; flex-direction: column; min-width: 0; }
+.cabecera .periodo {
+  font-weight: 600; font-size: 15px; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cabecera .sub { font-size: 12px; line-height: 1.2; color: var(--tinta-3); }
 .cabecera .iconos { display: flex; gap: 2px; margin-right: -6px; }
 .icono {
   /* 44 px es el minimo tactil de iOS. El glifo sigue a 17 px: lo que crece
@@ -100,7 +126,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  padding: 0 12px calc(10px + var(--seguro-inf));
+  padding: 0 12px var(--borde-inf);
 }
 
 /* ---------- avisos ---------- */
@@ -280,7 +306,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   width: 100%; max-width: 560px; max-height: 88dvh; overflow-y: auto;
   background: var(--paper);
   border-radius: 18px 18px 0 0;
-  padding: 8px 18px calc(20px + var(--seguro-inf));
+  padding: 8px 18px var(--borde-inf);
   animation: subir 200ms cubic-bezier(.2,.8,.3,1);
 }
 @keyframes subir { from { transform: translateY(14px) } to { transform: translateY(0) } }
@@ -399,7 +425,7 @@ button.fila.tocable .t::after { content: ' ›'; color: var(--tinta-3); }
 
 .brindis {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(14px + var(--seguro-inf));
+  bottom: var(--borde-inf);
   display: flex; align-items: center; gap: 14px;
   padding: 11px 16px; border-radius: 12px;
   background: var(--tinta); color: var(--paper);

@@ -163,7 +163,8 @@ AVISO = """
     padding: 5px 12px; text-align: center;
     font-family: ui-monospace, Menlo, monospace; }
   #aviso-prueba b { font-weight: 700; }
-  #app { padding-top: 28px; }
+  /* 28 px para el banner, mas la franja que la app reserva de verdad. */
+  #app { padding-top: calc(28px + var(--borde-sup)); }
 </style>
 <script>
   window.addEventListener('DOMContentLoaded', function () {
