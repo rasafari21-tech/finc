@@ -23,7 +23,7 @@ import { destinosDe, destinoAutomatico } from '../dominio/destinos.js';
 import { MODO, requierePreguntar, distribuirInformal } from '../dominio/informales.js';
 
 import {
-  cabecera, panelTechos, tarjetaFondo, teclado, fichasBucket,
+  cabecera, panelTechos, teclado, fichasBucket,
   previoReparto, visor, avisoDiagnostico, avisoSobrante, esc,
 } from '../ui/componentes.js';
 import {
@@ -155,7 +155,6 @@ function render(s) {
       ${avisoDiagnostico(s.diagnostico)}
       ${avisoSobrante(s)}
       ${panelTechos(s.periodo, s.fecha)}
-      ${tarjetaFondo(s.fondos)}
     </div>
 
     <div class="zona-captura">
@@ -210,6 +209,7 @@ function renderHoja(s) {
         sobranteActual: s.sobrante,
         historial: s.sobrantes,
         media: h.media ?? 0,
+        fondos: s.fondos,
       });
     case 'detalle':
       return hojaDetalleTecho({ periodo: s.periodo, bucket: h.bucket, movimientos: s.ultimos, fecha: s.fecha });

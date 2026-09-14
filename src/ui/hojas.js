@@ -551,7 +551,7 @@ export function hojaDistribucionManual({ importeCents, periodo }) {
  * La cifra del mes cerrado no cambia nunca. Elegir destino solo anota que se
  * hizo con ella.
  */
-export function hojaSobrante({ pendiente, sobranteActual, historial, media }) {
+export function hojaSobrante({ pendiente, sobranteActual, historial, media, fondos }) {
   const filasHistorial = ordenarHistorial(historial ?? []);
 
   const bloquePendiente = pendiente
@@ -580,10 +580,28 @@ export function hojaSobrante({ pendiente, sobranteActual, historial, media }) {
        </div>`
     : '';
 
+  // Los fondos viven aqui desde que se quito la tarjeta del panel: son dinero
+  // acumulado, igual que el sobrante, y en el panel solo ocupaban sitio
+  // enseñando dos ceros los primeros meses.
+  const bloqueFondos = `
+    <h3>Fondos</h3>
+    <div class="lista">
+      <div class="fila"><span class="t">Fondo de Ahorro</span>
+        <span class="v pos">${formatear(fondos?.FONDO_AHORRO?.saldoCents ?? 0)}</span>
+        <span class="s">lo que no gastaste de Reserva, mes a mes</span></div>
+      <div class="fila"><span class="t">Cartera de Inversión</span>
+        <span class="v pos">${formatear(fondos?.CARTERA_INVERSION?.saldoCents ?? 0)}</span>
+        <span class="s">lo que no gastaste de Inversión</span></div>
+    </div>
+    <div class="botones" style="margin-top:8px">
+      <button class="btn" data-accion="ver-fondos">Ver movimientos de los fondos</button>
+    </div>`;
+
   return envolver(`
     <h2>Lo que te sobra</h2>
     ${bloquePendiente}
     ${bloqueActual}
+    ${bloqueFondos}
 
     <h3>Historial</h3>
     ${filasHistorial.length

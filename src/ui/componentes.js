@@ -28,6 +28,10 @@ export function barraTecho(periodo, bucket, fechaHoy) {
   const rebasado = disponible < 0;
   const pct = techo > 0 ? Math.min(100, (gastado / techo) * 100) : 0;
   const ritmoPct = techo > 0 ? ritmo(periodo.id, fechaHoy) * 100 : 0;
+  // La marca de ritmo dice por donde va el mes: si la barra la pasa, vas
+  // gastando mas rapido de lo que corre el calendario. Sin gasto no hay nada
+  // que comparar y la marca sola es ruido, asi que no se dibuja.
+  const marcaVisible = techo > 0 && gastado > 0;
 
   return `
     <button class="techo" data-accion="detalle-techo" data-bucket="${bucket}"
@@ -38,29 +42,13 @@ export function barraTecho(periodo, bucket, fechaHoy) {
       </span>
       <span class="pista">
         <span class="relleno ${rebasado ? 'rebasado' : ''}" style="width:${techo > 0 ? pct : 0}%"></span>
-        ${techo > 0 ? `<span class="marca-ritmo" style="left:${ritmoPct}%"></span>` : ''}
+        ${marcaVisible ? `<span class="marca-ritmo" style="left:${ritmoPct}%"></span>` : ''}
       </span>
     </button>`;
 }
 
 export function panelTechos(periodo, fechaHoy) {
   return `<div class="techos">${ORDEN.map((b) => barraTecho(periodo, b, fechaHoy)).join('')}</div>`;
-}
-
-export function tarjetaFondo(fondos) {
-  const ahorro = fondos?.FONDO_AHORRO?.saldoCents ?? 0;
-  const cartera = fondos?.CARTERA_INVERSION?.saldoCents ?? 0;
-  return `
-    <button class="tarjeta-fondo" data-accion="ver-fondos">
-      <span>
-        <span class="et">Fondo de Ahorro</span>
-        <span class="val">${formatear(ahorro)}</span>
-      </span>
-      <span style="text-align:right">
-        <span class="et">Cartera</span>
-        <span class="val" style="font-size:15px">${formatear(cartera)}</span>
-      </span>
-    </button>`;
 }
 
 /** Teclado numerico propio: aparece al instante y no ofrece caracteres invalidos. */

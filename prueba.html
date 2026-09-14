@@ -175,15 +175,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   background: var(--tinta); opacity: .45;
 }
 
-.tarjeta-fondo {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; padding: 9px 13px; margin-bottom: 10px;
-  background: var(--acento-suave);
-  border-radius: var(--radio);
-}
-.tarjeta-fondo .et { font-size: 12px; color: var(--acento); font-weight: 600; }
-.tarjeta-fondo .val { font-size: 19px; font-weight: 700; color: var(--acento); }
-
 @media (prefers-reduced-motion: reduce) { .relleno { transition: none; } }
 
 /* ---------- captura ---------- */
@@ -458,7 +449,7 @@ const { POR_ID: CATEGORIAS } = __req('src/dominio/categorias.js');
 const { destinosDe, destinoAutomatico } = __req('src/dominio/destinos.js');
 const { MODO, requierePreguntar, distribuirInformal } = __req('src/dominio/informales.js');
 
-const { cabecera, panelTechos, tarjetaFondo, teclado, fichasBucket,
+const { cabecera, panelTechos, teclado, fichasBucket,
   previoReparto, visor, avisoDiagnostico, avisoSobrante, esc, } = __req('src/ui/componentes.js');
 const { hojaRechazo, hojaDetalleTecho, hojaInforme, hojaDiagnostico, hojaCategorias,
   hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaDistribucion,
@@ -587,7 +578,6 @@ function render(s) {
       ${avisoDiagnostico(s.diagnostico)}
       ${avisoSobrante(s)}
       ${panelTechos(s.periodo, s.fecha)}
-      ${tarjetaFondo(s.fondos)}
     </div>
 
     <div class="zona-captura">
@@ -642,6 +632,7 @@ function renderHoja(s) {
         sobranteActual: s.sobrante,
         historial: s.sobrantes,
         media: h.media ?? 0,
+        fondos: s.fondos,
       });
     case 'detalle':
       return hojaDetalleTecho({ periodo: s.periodo, bucket: h.bucket, movimientos: s.ultimos, fecha: s.fecha });
@@ -4058,6 +4049,10 @@ function barraTecho(periodo, bucket, fechaHoy) {
   const rebasado = disponible < 0;
   const pct = techo > 0 ? Math.min(100, (gastado / techo) * 100) : 0;
   const ritmoPct = techo > 0 ? ritmo(periodo.id, fechaHoy) * 100 : 0;
+  // La marca de ritmo dice por donde va el mes: si la barra la pasa, vas
+  // gastando mas rapido de lo que corre el calendario. Sin gasto no hay nada
+  // que comparar y la marca sola es ruido, asi que no se dibuja.
+  const marcaVisible = techo > 0 && gastado > 0;
 
   return `
     <button class="techo" data-accion="detalle-techo" data-bucket="${bucket}"
@@ -4068,29 +4063,13 @@ function barraTecho(periodo, bucket, fechaHoy) {
       </span>
       <span class="pista">
         <span class="relleno ${rebasado ? 'rebasado' : ''}" style="width:${techo > 0 ? pct : 0}%"></span>
-        ${techo > 0 ? `<span class="marca-ritmo" style="left:${ritmoPct}%"></span>` : ''}
+        ${marcaVisible ? `<span class="marca-ritmo" style="left:${ritmoPct}%"></span>` : ''}
       </span>
     </button>`;
 }
 
 function panelTechos(periodo, fechaHoy) {
   return `<div class="techos">${ORDEN.map((b) => barraTecho(periodo, b, fechaHoy)).join('')}</div>`;
-}
-
-function tarjetaFondo(fondos) {
-  const ahorro = fondos?.FONDO_AHORRO?.saldoCents ?? 0;
-  const cartera = fondos?.CARTERA_INVERSION?.saldoCents ?? 0;
-  return `
-    <button class="tarjeta-fondo" data-accion="ver-fondos">
-      <span>
-        <span class="et">Fondo de Ahorro</span>
-        <span class="val">${formatear(ahorro)}</span>
-      </span>
-      <span style="text-align:right">
-        <span class="et">Cartera</span>
-        <span class="val" style="font-size:15px">${formatear(cartera)}</span>
-      </span>
-    </button>`;
 }
 
 /** Teclado numerico propio: aparece al instante y no ofrece caracteres invalidos. */
@@ -4224,7 +4203,6 @@ function avisoSobrante(estado) {
   __e.esc = esc;
   __e.barraTecho = barraTecho;
   __e.panelTechos = panelTechos;
-  __e.tarjetaFondo = tarjetaFondo;
   __e.teclado = teclado;
   __e.fichasBucket = fichasBucket;
   __e.previoReparto = previoReparto;
@@ -4789,7 +4767,7 @@ function hojaDistribucionManual({ importeCents, periodo }) {
  * La cifra del mes cerrado no cambia nunca. Elegir destino solo anota que se
  * hizo con ella.
  */
-function hojaSobrante({ pendiente, sobranteActual, historial, media }) {
+function hojaSobrante({ pendiente, sobranteActual, historial, media, fondos }) {
   const filasHistorial = ordenarHistorial(historial ?? []);
 
   const bloquePendiente = pendiente
@@ -4818,10 +4796,28 @@ function hojaSobrante({ pendiente, sobranteActual, historial, media }) {
        </div>`
     : '';
 
+  // Los fondos viven aqui desde que se quito la tarjeta del panel: son dinero
+  // acumulado, igual que el sobrante, y en el panel solo ocupaban sitio
+  // enseñando dos ceros los primeros meses.
+  const bloqueFondos = `
+    <h3>Fondos</h3>
+    <div class="lista">
+      <div class="fila"><span class="t">Fondo de Ahorro</span>
+        <span class="v pos">${formatear(fondos?.FONDO_AHORRO?.saldoCents ?? 0)}</span>
+        <span class="s">lo que no gastaste de Reserva, mes a mes</span></div>
+      <div class="fila"><span class="t">Cartera de Inversión</span>
+        <span class="v pos">${formatear(fondos?.CARTERA_INVERSION?.saldoCents ?? 0)}</span>
+        <span class="s">lo que no gastaste de Inversión</span></div>
+    </div>
+    <div class="botones" style="margin-top:8px">
+      <button class="btn" data-accion="ver-fondos">Ver movimientos de los fondos</button>
+    </div>`;
+
   return envolver(`
     <h2>Lo que te sobra</h2>
     ${bloquePendiente}
     ${bloqueActual}
+    ${bloqueFondos}
 
     <h3>Historial</h3>
     ${filasHistorial.length

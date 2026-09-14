@@ -167,15 +167,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
   background: var(--tinta); opacity: .45;
 }
 
-.tarjeta-fondo {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; padding: 9px 13px; margin-bottom: 10px;
-  background: var(--acento-suave);
-  border-radius: var(--radio);
-}
-.tarjeta-fondo .et { font-size: 12px; color: var(--acento); font-weight: 600; }
-.tarjeta-fondo .val { font-size: 19px; font-weight: 700; color: var(--acento); }
-
 @media (prefers-reduced-motion: reduce) { .relleno { transition: none; } }
 
 /* ---------- captura ---------- */

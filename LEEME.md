@@ -176,6 +176,15 @@ justificaciones:
 
 La lista es editable desde Ajustes: se pueden añadir, renombrar y borrar.
 
+**Marca de ritmo.** La línea vertical de cada barra dice por dónde va el mes:
+el día 14 de 30 cae al 47 %. Si la barra la pasa, gastas más rápido de lo que
+corre el calendario. Solo aparece cuando hay gasto en ese techo; sin nada que
+comparar sería una raya suelta.
+
+**Fondos.** El Fondo de Ahorro y la Cartera no están en el panel: viven en la
+hoja del ◈, junto al sobrante, que es de lo mismo. En el panel solo enseñaban
+dos ceros los primeros meses.
+
 **Sobrante mensual.** Al cerrar el mes se calcula lo que quedó libre de
 **Esenciales y Recompensas** —Reserva e Inversión ya tienen destino automático,
 así que no son dinero libre—. La cifra se congela y se guarda en el historial.
