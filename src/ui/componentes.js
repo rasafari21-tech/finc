@@ -28,21 +28,22 @@ export function barraTecho(periodo, bucket, fechaHoy) {
   const rebasado = disponible < 0;
   const pct = techo > 0 ? Math.min(100, (gastado / techo) * 100) : 0;
   const ritmoPct = techo > 0 ? ritmo(periodo.id, fechaHoy) * 100 : 0;
-  // La marca de ritmo dice por donde va el mes: si la barra la pasa, vas
-  // gastando mas rapido de lo que corre el calendario. Sin gasto no hay nada
-  // que comparar y la marca sola es ruido, asi que no se dibuja.
-  const marcaVisible = techo > 0 && gastado > 0;
 
   return `
     <button class="techo" data-accion="detalle-techo" data-bucket="${bucket}"
-            aria-label="${ETIQUETAS[bucket]}: ${porcentaje(gastado, techo)} por ciento usado">
+            aria-label="${ETIQUETAS[bucket]}: ${porcentaje(gastado, techo)} por ciento usado, ${
+              techo > 0 && gastado / techo > ritmoPct / 100 ? 'por delante del' : 'por detrás del'
+            } ritmo del mes">
       <span class="nombre">${ETIQUETAS[bucket]}</span>
       <span class="cifra ${rebasado ? 'rebasado' : ''}">
         <b>${formatear(Math.abs(disponible))}</b> ${rebasado ? 'de más' : 'libres'}
       </span>
       <span class="pista">
-        <span class="relleno ${rebasado ? 'rebasado' : ''}" style="width:${techo > 0 ? pct : 0}%"></span>
-        ${marcaVisible ? `<span class="marca-ritmo" style="left:${ritmoPct}%"></span>` : ''}
+        <span class="canal">
+          <span class="relleno ${rebasado ? 'rebasado' : ''}" style="width:${techo > 0 ? pct : 0}%"></span>
+        </span>
+        ${techo > 0 ? `<span class="marca-ritmo" style="left:${ritmoPct}%"
+              title="Por aquí va el mes"></span>` : ''}
       </span>
     </button>`;
 }

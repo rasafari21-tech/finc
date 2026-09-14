@@ -178,8 +178,9 @@ La lista es editable desde Ajustes: se pueden añadir, renombrar y borrar.
 
 **Marca de ritmo.** La línea vertical de cada barra dice por dónde va el mes:
 el día 14 de 30 cae al 47 %. Si la barra la pasa, gastas más rápido de lo que
-corre el calendario. Solo aparece cuando hay gasto en ese techo; sin nada que
-comparar sería una raya suelta.
+corre el calendario. Sobresale del carril a propósito, para que se lea como la
+muesca de una regla y no como parte de la barra. Al tocar un techo, la hoja de
+detalle dice lo mismo con números y palabras: «20 % vs 47 %, vas por detrás».
 
 **Fondos.** El Fondo de Ahorro y la Cartera no están en el panel: viven en la
 hoja del ◈, junto al sobrante, que es de lo mismo. En el panel solo enseñaban

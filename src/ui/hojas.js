@@ -141,6 +141,13 @@ export function hojaDetalleTecho({ periodo, bucket, movimientos, fecha }) {
   const gastado = periodo.totales[bucket] ?? 0;
   const restante = margen(periodo, bucket);
   const proy = proyeccion(periodo, bucket, fecha);
+
+  // Lo mismo que dice la marca vertical de la barra, pero con palabras.
+  const dia = diaDeFecha(fecha);
+  const dias = diasEnPeriodo(periodo.id);
+  const delMes = dia / dias;
+  const delTecho = techo > 0 ? gastado / techo : 0;
+  const adelantado = delTecho > delMes;
   const delBucket = movimientos.filter((m) => m.bucket === bucket).slice(0, 10);
 
   const porCategoria = {};
@@ -159,7 +166,16 @@ export function hojaDetalleTecho({ periodo, bucket, movimientos, fecha }) {
       <div class="fila"><span class="t">Proyección a fin de mes</span>
         <span class="v ${proy > techo ? 'neg' : ''}">${formatear(proy)}</span>
         <span class="s">al ritmo actual de gasto</span></div>
+      <div class="fila"><span class="t">Ritmo</span>
+        <span class="v ${adelantado ? 'neg' : 'pos'}">${Math.round(delTecho * 100)} % vs ${Math.round(delMes * 100)} %</span>
+        <span class="s">llevas gastado frente al mes transcurrido ·
+          ${adelantado ? 'vas por delante, ojo' : 'vas por detrás, bien'}</span></div>
     </div>
+    <p style="font-size:12.5px;margin-top:10px">
+      La línea vertical de cada barra marca esto mismo: por dónde va el mes.
+      Hoy es el día ${dia} de ${dias}. Si la barra pasa la marca, gastas más
+      rápido de lo que corre el calendario.
+    </p>
 
     ${top.length ? `<h3>Por categoría</h3><div class="lista">${top
       .map(

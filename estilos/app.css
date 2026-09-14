@@ -141,10 +141,16 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 .techo .cifra b { color: var(--tinta); }
 .techo .cifra.rebasado b { color: var(--mal); }
 
+/* La pista es mas alta que el carril a proposito: los 2 px de sobra arriba y
+   abajo son para que la marca de ritmo sobresalga y se lea como la muesca de
+   una regla, no como un pixel perdido dentro de la barra. */
 .pista {
   grid-column: 1 / -1;
   position: relative;
-  height: 14px;
+  height: 18px;
+}
+.canal {
+  position: absolute; left: 0; right: 0; top: 2px; bottom: 2px;
   background: var(--sup-3);
   border-radius: 4px;
   overflow: hidden;
@@ -164,7 +170,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--acento
 }
 .marca-ritmo {
   position: absolute; top: 0; bottom: 0; width: 2px;
-  background: var(--tinta); opacity: .45;
+  margin-left: -1px;            /* centrada justo en el dia, no a su derecha */
+  background: var(--tinta);
+  opacity: .5;
+  border-radius: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) { .relleno { transition: none; } }
