@@ -13,9 +13,7 @@ import { evaluarMovimiento, aplicarVeredicto, sugerirDestino, medianaDe } from '
 import { periodosPendientes, planificarCierre, planificarIngresoNormal } from '../dominio/cierre.js';
 import { diagnosticar, redactarAlerta } from '../dominio/diagnostico.js';
 import { POR_ID as CATEGORIAS } from '../dominio/categorias.js';
-import {
-  MODO, requierePreguntar, distribuirInformal, opcionesDeReparto,
-} from '../dominio/informales.js';
+import { distribuirInformal, limpiarSeleccion } from '../dominio/informales.js';
 import {
   validarDestino, destinoAutomatico, categoriaDe, destinosDe,
 } from '../dominio/destinos.js';
@@ -362,37 +360,23 @@ export function crearComandos(repo, reloj) {
     // --- ingresos informales ---------------------------------------------
 
     /**
-     * Registra un ingreso informal (§6 a §10).
+     * Registra un ingreso informal.
      *
-     * Pequeño: se reparte solo, mitad Inversion y mitad Reserva.
-     * Grande: devuelve { requierePreguntar: true, opciones } para que la
-     * interfaz pregunte antes de tocar nada.
+     * Va a los techos que venga marcados, dividido en partes iguales. Si no
+     * se dice nada, Inversion y Reserva, que es lo de casi siempre. No
+     * pregunta ni interrumpe: la eleccion se hace en las fichas, antes de
+     * pulsar guardar, y ahi se ve el reparto al vuelo.
      */
     async registrarIngreso(cmd) {
       const periodo = await comandos.periodoActual();
-      const ajustes = await repo.ajustes();
       const importeCents = cmd.importeCents;
 
       if (!(importeCents > 0)) {
         return { ok: false, veredicto: { tipo: 'DENY', mensaje: 'El importe debe ser mayor que cero.' } };
       }
 
-      const umbral = ajustes?.umbralPregunta ?? 5_000;
-      const hayModo = Boolean(cmd.modo);
-
-      if (!hayModo && requierePreguntar(importeCents, umbral)) {
-        return {
-          ok: false,
-          requierePreguntar: true,
-          importeCents,
-          opciones: opcionesDeReparto(importeCents, periodo, periodo.pesos ?? ajustes.pesos),
-        };
-      }
-
       const reparto = distribuirInformal(importeCents, periodo, {
-        modo: cmd.modo ?? MODO.MITADES,
-        bucketManual: cmd.bucketManual,
-        pesosBase: periodo.pesos ?? ajustes.pesos,
+        buckets: limpiarSeleccion(cmd.buckets),
       });
 
       const mov = normalizar(
@@ -415,13 +399,13 @@ export function crearComandos(repo, reloj) {
           movementId: mov.id,
           bucket: b,
           centavos: reparto.partes[b],
-          motivo: `informal:${reparto.modo}`,
+          motivo: 'informal',
         })),
         periodo: actualizado,
         evento: {
           tipo: 'INGRESO_INFORMAL',
           periodId: periodo.id,
-          detalle: { importeCents, modo: reparto.modo, ajuste: reparto.ajuste, partes: reparto.partes },
+          detalle: { importeCents, seleccion: reparto.seleccion, partes: reparto.partes },
         },
       });
 
@@ -558,4 +542,4 @@ export function crearComandos(repo, reloj) {
   return comandos;
 }
 
-export { ceros, ORDEN, RESERVA, CARTERA_INVERSION, MODO };
+export { ceros, ORDEN, RESERVA, CARTERA_INVERSION };

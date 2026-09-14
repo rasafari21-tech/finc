@@ -456,13 +456,12 @@ const { parsearCentavos, formatear } = __req('src/dominio/dinero.js');
 const { ORDEN, ETIQUETAS, FONDO_AHORRO, CARTERA_INVERSION } = __req('src/dominio/buckets.js');
 const { POR_ID: CATEGORIAS } = __req('src/dominio/categorias.js');
 const { destinosDe, destinoAutomatico } = __req('src/dominio/destinos.js');
-const { MODO, requierePreguntar, distribuirInformal } = __req('src/dominio/informales.js');
+const { previoDeSeleccion, limpiarSeleccion } = __req('src/dominio/informales.js');
 
-const { cabecera, panelTechos, teclado, fichasBucket,
-  previoReparto, visor, avisoDiagnostico, avisoSobrante, esc, } = __req('src/ui/componentes.js');
+const { cabecera, panelTechos, teclado, fichasBucket, fichasIngreso,
+  visor, avisoDiagnostico, avisoSobrante, esc, } = __req('src/ui/componentes.js');
 const { hojaRechazo, hojaDetalleTecho, hojaInforme, hojaDiagnostico, hojaCategorias,
-  hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaDistribucion,
-  hojaDistribucionManual, hojaSobrante, } = __req('src/ui/hojas.js');
+  hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaSobrante, } = __req('src/ui/hojas.js');
 
 const raiz = document.getElementById('app');
 const capaHojas = document.getElementById('hojas');
@@ -539,10 +538,9 @@ function pistaDeCaptura(s) {
   if (!c.digitos) return c.modo === 'ingreso' ? 'Teclea lo que entró' : 'Teclea el importe';
 
   if (c.modo === 'ingreso') {
-    const centavos = parsearCentavos(c.digitos);
-    const umbral = s.ajustes?.umbralPregunta ?? 5000;
-    if (centavos > 0 && requierePreguntar(centavos, umbral)) return 'Te preguntaré cómo repartirlo';
-    return 'Mitad Inversión, mitad Reserva';
+    const n = limpiarSeleccion(c.bucketsIngreso).length;
+    if (n === 1) return 'Va entero al techo marcado';
+    return `Se divide entre los ${n} techos marcados`;
   }
 
   if (!c.bucket) return 'Elige un techo';
@@ -555,16 +553,10 @@ function pistaDeCaptura(s) {
   return cat ? `${ETIQUETAS[c.bucket]} · ${cat.nombre}` : ETIQUETAS[c.bucket];
 }
 
-/** Vista previa del reparto de un ingreso informal, con las reglas nuevas. */
+/** Cuanto tocaria a cada techo marcado con lo que hay tecleado ahora mismo. */
 function previoIngreso(s, centavos) {
-  if (!(centavos > 0) || !s.periodo) return null;
-  const umbral = s.ajustes?.umbralPregunta ?? 5000;
-  if (requierePreguntar(centavos, umbral)) return null;
-  try {
-    return distribuirInformal(centavos, s.periodo, { modo: MODO.MITADES, pesosBase: s.periodo.pesos }).partes;
-  } catch {
-    return null;
-  }
+  if (!s.periodo) return null;
+  return previoDeSeleccion(centavos, s.periodo, limpiarSeleccion(s.captura.bucketsIngreso));
 }
 
 function render(s) {
@@ -598,7 +590,7 @@ function render(s) {
       ${visor(formatearEntrada(s.captura.digitos), pistaDeCaptura(s), s.captura.modo)}
 
       ${esIngreso
-        ? previoReparto(previoIngreso(s, centavos))
+        ? fichasIngreso(limpiarSeleccion(s.captura.bucketsIngreso), previoIngreso(s, centavos))
         : fichasBucket(s.periodo, s.captura.bucket)}
 
       ${teclado()}
@@ -631,10 +623,6 @@ function renderHoja(s) {
         captura: s.captura,
         importeTexto: s.captura.digitos ? `${s.ajustes?.moneda ?? 'R$'}${formatearEntrada(s.captura.digitos)}` : '',
       });
-    case 'distribucion':
-      return hojaDistribucion({ importeCents: h.importeCents, opciones: h.opciones });
-    case 'distribucion-manual':
-      return hojaDistribucionManual({ importeCents: h.importeCents, periodo: s.periodo });
     case 'sobrante':
       return hojaSobrante({
         pendiente: s.sobrantePendiente,
@@ -699,7 +687,24 @@ const acciones = {
   },
 
   modo(el, s) {
-    estado.set({ captura: { ...capturaVacia(), modo: el.dataset.modo, digitos: s.captura.digitos } });
+    estado.set({
+      captura: {
+        ...capturaVacia(),
+        modo: el.dataset.modo,
+        digitos: s.captura.digitos,
+        bucketsIngreso: s.captura.bucketsIngreso,
+      },
+    });
+  },
+
+  /** Marca o desmarca un techo para el ingreso. Nunca se queda sin ninguno. */
+  'alternar-ingreso'(el, s) {
+    const b = el.dataset.bucket;
+    const actual = limpiarSeleccion(s.captura.bucketsIngreso);
+    const siguiente = actual.includes(b) ? actual.filter((x) => x !== b) : [...actual, b];
+    if (!siguiente.length) return; // desmarcar el ultimo no hace nada
+    estado.set({ captura: { ...s.captura, bucketsIngreso: siguiente } });
+    vibrar(8);
   },
 
   /**
@@ -815,24 +820,6 @@ const acciones = {
 
   // --- distribucion de ingresos ----------------------------------------
 
-  async 'elegir-distribucion'(el, s) {
-    const modo = el.dataset.modo;
-    const importeCents = s.hoja.importeCents;
-
-    if (modo === MODO.MANUAL) {
-      abrirHoja({ tipo: 'distribucion-manual', importeCents });
-      return;
-    }
-    cerrarHoja();
-    await guardarIngreso(importeCents, { modo });
-  },
-
-  async 'elegir-bucket-ingreso'(el, s) {
-    const importeCents = s.hoja.importeCents;
-    cerrarHoja();
-    await guardarIngreso(importeCents, { modo: MODO.MANUAL, bucketManual: el.dataset.bucket });
-  },
-
   // --- alta -------------------------------------------------------------
 
   async 'guardar-alta'() {
@@ -938,15 +925,6 @@ const acciones = {
     brindar(`Ingreso mensual: ${formatear(centavos)}.`);
   },
 
-  async 'guardar-umbral'() {
-    const centavos = parsearCentavos(capaHojas.querySelector('[data-campo="umbralPregunta"]')?.value ?? '');
-    if (!(centavos > 0)) return;
-    const ajustes = await repo.ajustes();
-    await repo.guardarAjustes({ ...ajustes, umbralPregunta: centavos });
-    await refrescar();
-    abrirHoja({ tipo: 'ajustes', estadisticas: await repo.estadisticas() });
-  },
-
   async 'añadir-destino'(el) {
     const nombre = prompt('Nombre del destino');
     if (!nombre?.trim()) return;
@@ -1030,8 +1008,7 @@ function vibrar(ms) {
 /** Camino unico de guardado de gastos. */
 async function guardar(captura) {
   if (captura.modo === 'ingreso') {
-    const centavos = parsearCentavos(captura.digitos);
-    return guardarIngreso(centavos, {});
+    return guardarIngreso(parsearCentavos(captura.digitos), captura.bucketsIngreso);
   }
 
   const centavos = parsearCentavos(captura.digitos);
@@ -1086,22 +1063,21 @@ async function guardar(captura) {
 }
 
 /** Camino unico de registro de ingresos informales. */
-async function guardarIngreso(centavos, { modo, bucketManual }) {
+async function guardarIngreso(centavos, buckets) {
   if (!(centavos > 0)) return;
 
-  const r = await comandos.registrarIngreso({ importeCents: centavos, modo, bucketManual });
+  const r = await comandos.registrarIngreso({ importeCents: centavos, buckets });
 
-  if (r.requierePreguntar) {
-    abrirHoja({ tipo: 'distribucion', importeCents: r.importeCents, opciones: r.opciones });
-    return;
-  }
   if (!r.ok) {
     brindar(r.veredicto?.mensaje ?? 'No se pudo registrar.');
     return;
   }
 
   vibrar(14);
-  estado.set({ captura: capturaVacia(), hoja: null });
+  estado.set({
+    captura: { ...capturaVacia(), modo: 'ingreso', bucketsIngreso: limpiarSeleccion(buckets) },
+    hoja: null,
+  });
   await refrescar();
 
   const destinos = ORDEN.filter((b) => r.reparto[b] > 0)
@@ -2608,7 +2584,7 @@ const { evaluarMovimiento, aplicarVeredicto, sugerirDestino, medianaDe } = __req
 const { periodosPendientes, planificarCierre, planificarIngresoNormal } = __req('src/dominio/cierre.js');
 const { diagnosticar, redactarAlerta } = __req('src/dominio/diagnostico.js');
 const { POR_ID: CATEGORIAS } = __req('src/dominio/categorias.js');
-const { MODO, requierePreguntar, distribuirInformal, opcionesDeReparto, } = __req('src/dominio/informales.js');
+const { distribuirInformal, limpiarSeleccion } = __req('src/dominio/informales.js');
 const { validarDestino, destinoAutomatico, categoriaDe, destinosDe, } = __req('src/dominio/destinos.js');
 // destinoAutomatico se usa para rellenar el destino unico de Reserva.
 const { crearSobrante, resolverSobrante: resolverRegistro, sobranteProyectado,
@@ -2951,37 +2927,23 @@ function crearComandos(repo, reloj) {
     // --- ingresos informales ---------------------------------------------
 
     /**
-     * Registra un ingreso informal (§6 a §10).
+     * Registra un ingreso informal.
      *
-     * Pequeño: se reparte solo, mitad Inversion y mitad Reserva.
-     * Grande: devuelve { requierePreguntar: true, opciones } para que la
-     * interfaz pregunte antes de tocar nada.
+     * Va a los techos que venga marcados, dividido en partes iguales. Si no
+     * se dice nada, Inversion y Reserva, que es lo de casi siempre. No
+     * pregunta ni interrumpe: la eleccion se hace en las fichas, antes de
+     * pulsar guardar, y ahi se ve el reparto al vuelo.
      */
     async registrarIngreso(cmd) {
       const periodo = await comandos.periodoActual();
-      const ajustes = await repo.ajustes();
       const importeCents = cmd.importeCents;
 
       if (!(importeCents > 0)) {
         return { ok: false, veredicto: { tipo: 'DENY', mensaje: 'El importe debe ser mayor que cero.' } };
       }
 
-      const umbral = ajustes?.umbralPregunta ?? 5_000;
-      const hayModo = Boolean(cmd.modo);
-
-      if (!hayModo && requierePreguntar(importeCents, umbral)) {
-        return {
-          ok: false,
-          requierePreguntar: true,
-          importeCents,
-          opciones: opcionesDeReparto(importeCents, periodo, periodo.pesos ?? ajustes.pesos),
-        };
-      }
-
       const reparto = distribuirInformal(importeCents, periodo, {
-        modo: cmd.modo ?? MODO.MITADES,
-        bucketManual: cmd.bucketManual,
-        pesosBase: periodo.pesos ?? ajustes.pesos,
+        buckets: limpiarSeleccion(cmd.buckets),
       });
 
       const mov = normalizar(
@@ -3004,13 +2966,13 @@ function crearComandos(repo, reloj) {
           movementId: mov.id,
           bucket: b,
           centavos: reparto.partes[b],
-          motivo: `informal:${reparto.modo}`,
+          motivo: 'informal',
         })),
         periodo: actualizado,
         evento: {
           tipo: 'INGRESO_INFORMAL',
           periodId: periodo.id,
-          detalle: { importeCents, modo: reparto.modo, ajuste: reparto.ajuste, partes: reparto.partes },
+          detalle: { importeCents, seleccion: reparto.seleccion, partes: reparto.partes },
         },
       });
 
@@ -3153,7 +3115,6 @@ function crearComandos(repo, reloj) {
   __e.ORDEN = ORDEN;
   __e.RESERVA = RESERVA;
   __e.CARTERA_INVERSION = CARTERA_INVERSION;
-  __e.MODO = MODO;
   __e.crearComandos = crearComandos;
 };
 
@@ -3328,6 +3289,8 @@ function capturaVacia() {
     modo: 'gasto', // gasto | ingreso
     digitos: '',
     bucket: null,
+    // Techos marcados en modo ingreso. Inversion y Reserva de salida.
+    bucketsIngreso: ['INVERSION', 'RESERVA'],
     categoryId: null,
     nota: '',
     tags: [],
@@ -3824,43 +3787,54 @@ __m['src/dominio/informales.js'] = function (__e, __req) {
  * cosa: los R$20 que entran a mitad de mes y que, si se quedan «libres», se
  * gastan solos. Ningun ingreso extraordinario queda suelto.
  *
- * Dos comportamientos segun el tamaño:
- *   pequeño  -> mitad Inversion, mitad Reserva, sin preguntar nada
- *   grande   -> se pregunta como repartirlo, con tres opciones
+ * El usuario elige a que techos va. Inversion y Reserva vienen marcados, que
+ * es lo que se quiere casi siempre, pero se puede marcar cualquier
+ * combinacion. Lo que entra se divide en partes iguales entre los marcados.
  *
- * Y, por encima de todo, el reparto mira el estado real del mes: si un techo
- * ya esta en rojo, el dinero nuevo tapa ese agujero antes que nada.
+ * Partes iguales, no ponderadas: es lo que una persona espera cuando marca dos
+ * casillas. Marcas dos, mitad y mitad; marcas tres, un tercio cada uno. El
+ * reparto 50/25/15/10 ya tiene su sitio, que es el ingreso mensual normal.
  */
 
 const { ESENCIALES, INVERSION, RESERVA, RECOMPENSAS, ORDEN, ceros } = __req('src/dominio/buckets.js');
-const { repartirRedondo, objetivosAPesos } = __req('src/dominio/redondeo.js');
+const { repartirRedondo } = __req('src/dominio/redondeo.js');
 const { sumar } = __req('src/dominio/dinero.js');
 
-const MODO = {
-  MITADES: 'MITADES',
-  CUATRO: 'CUATRO',
-  MANUAL: 'MANUAL',
-};
+/** Lo que viene marcado al abrir el modo ingreso. */
+const SELECCION_POR_DEFECTO = [INVERSION, RESERVA];
 
-/** A partir de aqui se pregunta en vez de decidir solo. */
-const UMBRAL_PREGUNTA = 5_000; // R$50
+/**
+ * Reparte 10.000 puntos basicos en partes iguales entre los techos marcados.
+ * Tres partes no dan un numero redondo (3.333,33 cada una), asi que el resto
+ * se coloca por orden canonico: el total siempre suma 10.000 exactos.
+ */
+function pesosDeSeleccion(buckets) {
+  const activos = ORDEN.filter((b) => buckets.includes(b));
+  if (!activos.length) throw new Error('INFORMAL_SIN_SELECCION');
 
-/** Mitad y mitad entre lo que construye futuro y lo que da colchon. */
-const PESOS_MITADES = {
-  [ESENCIALES]: 0,
-  [INVERSION]: 5_000,
-  [RESERVA]: 5_000,
-  [RECOMPENSAS]: 0,
-};
+  const base = Math.floor(10_000 / activos.length);
+  const pesos = ceros();
+  for (const b of activos) pesos[b] = base;
 
-function requierePreguntar(importeCents, umbral = UMBRAL_PREGUNTA) {
-  return importeCents >= umbral;
+  let resto = 10_000 - base * activos.length;
+  for (const b of activos) {
+    if (resto <= 0) break;
+    pesos[b] += 1;
+    resto -= 1;
+  }
+  return pesos;
+}
+
+/** Normaliza lo que llega de la interfaz: sin duplicados y en orden canonico. */
+function limpiarSeleccion(buckets) {
+  const limpia = ORDEN.filter((b) => (buckets ?? []).includes(b));
+  return limpia.length ? limpia : [...SELECCION_POR_DEFECTO];
 }
 
 /**
  * Cuanto le falta a cada techo para dejar de estar en rojo.
- * Un techo rebasado es una deuda del mes consigo mismo, y es el primer sitio
- * al que debe ir el dinero que entra de mas.
+ * Ya no se usa para redirigir el dinero —manda lo que marque el usuario—,
+ * pero la interfaz lo enseña en cada ficha para que decida con el dato.
  */
 function deficits(periodo) {
   const salida = ceros();
@@ -3871,142 +3845,41 @@ function deficits(periodo) {
 }
 
 /**
- * Calcula los pesos con los que repartir, mirando el estado del mes (§10).
- *
- * Sin techos en rojo, manda la distribucion elegida. Con techos en rojo, el
- * dinero tapa primero y solo reparte lo que sobre.
- */
-function pesosInteligentes(importeCents, periodo, pesosBase) {
-  const d = deficits(periodo);
-  const totalDeficit = sumar(ORDEN.map((b) => d[b]));
-
-  if (totalDeficit === 0) {
-    return { pesos: pesosBase, motivo: 'SIN_DEFICIT', deficits: d, totalDeficit };
-  }
-
-  if (importeCents <= totalDeficit) {
-    return {
-      pesos: objetivosAPesos(d) ?? pesosBase,
-      motivo: 'TAPA_DEFICIT',
-      deficits: d,
-      totalDeficit,
-      cubreDelDeficit: importeCents,
-    };
-  }
-
-  // Tapa los agujeros y reparte el resto con los pesos elegidos.
-  const sobra = importeCents - totalDeficit;
-  const objetivos = ceros();
-  for (const b of ORDEN) {
-    objetivos[b] = d[b] + Math.round((sobra * (pesosBase[b] ?? 0)) / 10_000);
-  }
-
-  return {
-    pesos: objetivosAPesos(objetivos) ?? pesosBase,
-    motivo: 'TAPA_Y_REPARTE',
-    deficits: d,
-    totalDeficit,
-    cubreDelDeficit: totalDeficit,
-  };
-}
-
-/**
- * Resuelve el reparto completo de un ingreso informal.
+ * Resuelve el reparto de un ingreso informal entre los techos marcados.
  *
  * @param {number} importeCents
- * @param {Object} periodo periodo abierto, con techos y totales
+ * @param {Object} periodo periodo abierto
  * @param {Object} opciones
- * @param {string} opciones.modo MODO.*  (por defecto MITADES)
- * @param {string} opciones.bucketManual obligatorio si modo es MANUAL
- * @param {Object} opciones.pesosBase pesos del periodo, para MODO.CUATRO
- * @param {boolean} opciones.inteligente mirar el estado del mes (por defecto si)
+ * @param {string[]} opciones.buckets techos marcados; por defecto Inversion y Reserva
  */
 function distribuirInformal(importeCents, periodo, opciones = {}) {
-  const {
-    modo = MODO.MITADES,
-    bucketManual = null,
-    pesosBase = periodo?.pesos,
-    inteligente = true,
-  } = opciones;
+  const seleccion = limpiarSeleccion(opciones.buckets);
+  const pesos = pesosDeSeleccion(seleccion);
 
-  if (modo === MODO.MANUAL) {
-    if (!ORDEN.includes(bucketManual)) throw new Error('INFORMAL_SIN_BUCKET_MANUAL');
-    const partes = ceros();
-    partes[bucketManual] = importeCents;
-    return {
-      partes,
-      modo,
-      fragmentado: false,
-      motivo: 'ELECCION_MANUAL',
-      explicacion: `Va entero a ${bucketManual}.`,
-    };
-  }
+  // El prioritario se lleva el importe entero cuando no se puede fragmentar
+  // en cantidades redondas. Reserva si esta marcada, y si no el primero.
+  const prioritario = seleccion.includes(RESERVA) ? RESERVA : seleccion[0];
+  const { partes, fragmentado, motivo } = repartirRedondo(importeCents, pesos, { prioritario });
 
-  const elegidos = modo === MODO.CUATRO ? pesosBase : PESOS_MITADES;
-
-  const ajuste = inteligente
-    ? pesosInteligentes(importeCents, periodo, elegidos)
-    : { pesos: elegidos, motivo: 'SIN_DEFICIT', deficits: ceros(), totalDeficit: 0 };
-
-  // Al tapar deficit el prioritario es el techo mas en rojo; si no, Reserva,
-  // que es el destino por defecto de lo que no se puede partir.
-  const prioritario =
-    ajuste.totalDeficit > 0
-      ? ORDEN.reduce((a, b) => (ajuste.deficits[b] > ajuste.deficits[a] ? b : a), ORDEN[0])
-      : RESERVA;
-
-  const { partes, fragmentado, motivo } = repartirRedondo(importeCents, ajuste.pesos, { prioritario });
-
-  return {
-    partes,
-    modo,
-    fragmentado,
-    motivo,
-    ajuste: ajuste.motivo,
-    deficits: ajuste.deficits,
-    totalDeficit: ajuste.totalDeficit,
-    prioritario,
-  };
+  return { partes, seleccion, fragmentado, motivo, prioritario };
 }
 
-/** Vista previa de las tres opciones, para la hoja de eleccion (§9). */
-function opcionesDeReparto(importeCents, periodo, pesosBase) {
-  return [
-    {
-      id: MODO.MITADES,
-      titulo: 'Reserva e Inversión',
-      detalle: 'Mitad y mitad.',
-      reparto: distribuirInformal(importeCents, periodo, { modo: MODO.MITADES, pesosBase }),
-    },
-    {
-      id: MODO.CUATRO,
-      titulo: 'Entre las cuatro',
-      detalle: 'Con tu reparto habitual.',
-      reparto: distribuirInformal(importeCents, periodo, { modo: MODO.CUATRO, pesosBase }),
-    },
-    {
-      id: MODO.MANUAL,
-      titulo: 'Lo elijo yo',
-      detalle: 'Todo a un solo techo.',
-      reparto: null,
-    },
-  ];
+/** Vista previa para las fichas: cuanto tocaria a cada techo ahora mismo. */
+function previoDeSeleccion(importeCents, periodo, buckets) {
+  if (!(importeCents > 0)) return null;
+  try {
+    return distribuirInformal(importeCents, periodo, { buckets }).partes;
+  } catch {
+    return null;
+  }
 }
 
 /** Frase que explica que hizo el reparto, para enseñarla tras guardar. */
 function explicarReparto(resultado, formatear) {
-  const { partes, ajuste, totalDeficit } = resultado;
-  const conDinero = ORDEN.filter((b) => partes[b] > 0);
-
-  const lista = conDinero.map((b) => `${formatear(partes[b])} a ${b}`).join(' y ');
-
-  if (ajuste === 'TAPA_DEFICIT') {
-    return `${lista}. Iba todo a tapar lo que ya te habías pasado.`;
-  }
-  if (ajuste === 'TAPA_Y_REPARTE') {
-    return `${lista}. Primero tapó ${formatear(totalDeficit)} de sobrepaso.`;
-  }
-  return lista;
+  const { partes } = resultado;
+  return ORDEN.filter((b) => partes[b] > 0)
+    .map((b) => `${formatear(partes[b])} a ${b}`)
+    .join(' y ');
 }
 
 
@@ -4016,15 +3889,14 @@ function explicarReparto(resultado, formatear) {
   __e.RESERVA = RESERVA;
   __e.ESENCIALES = ESENCIALES;
   __e.RECOMPENSAS = RECOMPENSAS;
-  __e.requierePreguntar = requierePreguntar;
+  __e.sumar = sumar;
+  __e.pesosDeSeleccion = pesosDeSeleccion;
+  __e.limpiarSeleccion = limpiarSeleccion;
   __e.deficits = deficits;
-  __e.pesosInteligentes = pesosInteligentes;
   __e.distribuirInformal = distribuirInformal;
-  __e.opcionesDeReparto = opcionesDeReparto;
+  __e.previoDeSeleccion = previoDeSeleccion;
   __e.explicarReparto = explicarReparto;
-  __e.MODO = MODO;
-  __e.UMBRAL_PREGUNTA = UMBRAL_PREGUNTA;
-  __e.PESOS_MITADES = PESOS_MITADES;
+  __e.SELECCION_POR_DEFECTO = SELECCION_POR_DEFECTO;
 };
 
 __m['src/ui/componentes.js'] = function (__e, __req) {
@@ -4108,14 +3980,24 @@ function fichasBucket(periodo, seleccionado) {
   }).join('')}</div>`;
 }
 
-/** Vista previa del reparto 50/25/15/10 mientras se teclea un ingreso. */
-function previoReparto(reparto) {
-  return `<div class="previo-reparto">${ORDEN.map(
-    (b) => `<div>
-        <span class="p">${ETIQUETAS[b]}</span>
-        <span class="v">${reparto ? formatear(reparto[b]) : '—'}</span>
-      </div>`,
-  ).join('')}</div>`;
+/**
+ * Fichas de ingreso: multiseleccion con el reparto en vivo.
+ *
+ * Misma fila que las fichas de gasto, pero aqui se pueden marcar varias y cada
+ * una enseña cuanto le tocaria ahora mismo. Asi la subdivision se ve antes de
+ * guardar, no despues.
+ */
+function fichasIngreso(seleccionadas, reparto) {
+  return `<div class="fichas">${ORDEN.map((b) => {
+    const marcado = seleccionadas.includes(b);
+    const toca = reparto?.[b] ?? 0;
+    return `
+      <button class="ficha" data-accion="alternar-ingreso" data-bucket="${b}"
+              aria-pressed="${marcado}">
+        ${ETIQUETAS[b]}
+        <span class="restante">${marcado ? (toca > 0 ? formatear(toca) : '—') : '·'}</span>
+      </button>`;
+  }).join('')}</div>`;
 }
 
 /** Visor del importe, con el texto de ayuda contextual debajo. */
@@ -4215,7 +4097,7 @@ function avisoSobrante(estado) {
   __e.panelTechos = panelTechos;
   __e.teclado = teclado;
   __e.fichasBucket = fichasBucket;
-  __e.previoReparto = previoReparto;
+  __e.fichasIngreso = fichasIngreso;
   __e.visor = visor;
   __e.filaMovimiento = filaMovimiento;
   __e.cabecera = cabecera;
@@ -4236,7 +4118,6 @@ const { margen, proyeccion, nombrePeriodo, diasEnPeriodo, diaDeFecha } = __req('
 const { RAZONES_RESERVA, POR_ID: CATEGORIAS, deBucket, deIngreso } = __req('src/dominio/categorias.js');
 const { destinosDe } = __req('src/dominio/destinos.js');
 const { DESTINOS_SOBRANTE, ordenarHistorial } = __req('src/dominio/sobrante.js');
-const { MODO } = __req('src/dominio/informales.js');
 const { REGLAS_NUCLEO } = __req('src/dominio/reglas.js');
 const { etiquetaDestino } = __req('src/dominio/carry.js');
 const { porcentaje } = __req('src/dominio/dinero.js');
@@ -4587,17 +4468,6 @@ function hojaAjustes({ ajustes, estadisticas, boveda }) {
       )
       .join('')}
 
-    <h3>Ingresos informales</h3>
-    <div class="campo">
-      <label for="umbral">A partir de cuánto te pregunto cómo repartirlo</label>
-      <input id="umbral" type="text" inputmode="decimal" data-campo="umbralPregunta"
-             value="${formatear(ajustes.umbralPregunta ?? 5000).replace(/^\D+/, '')}">
-      <span class="ayuda">Por debajo va mitad Inversión, mitad Reserva, sin preguntar.</span>
-    </div>
-    <div class="botones" style="margin-top:0">
-      <button class="btn" data-accion="guardar-umbral">Guardar umbral</button>
-    </div>
-
     <h3>Avisos</h3>
     ${[
       ['sobrante', 'Lo que te sobra, al acabar el mes'],
@@ -4733,61 +4603,6 @@ function hojaDestinos({ bucket, ajustes, captura, importeTexto }) {
 }
 
 /**
- * Como repartir un ingreso informal grande (§9).
- * Tres opciones, con las cifras ya calculadas: nadie elige a ciegas.
- */
-function hojaDistribucion({ importeCents, opciones }) {
-  const resumen = (r) => {
-    if (!r) return '';
-    const partes = ORDEN.filter((b) => r.partes[b] > 0)
-      .map((b) => `${formatear(r.partes[b])} · ${ETIQUETAS[b]}`)
-      .join('  ·  ');
-    // Sin color en linea: dentro del boton destacado hay fondo acento y un
-    // estilo inline ganaria a la hoja de estilo, dejando azul sobre azul.
-    const nota = r.ajuste === 'TAPA_DEFICIT' || r.ajuste === 'TAPA_Y_REPARTE'
-      ? '<br><small class="nota-aviso">Va a tapar lo que ya te habías pasado.</small>'
-      : !r.fragmentado
-        ? '<br><small>Entero, sin partirlo en céntimos.</small>'
-        : '';
-    return `<small>${esc(partes)}</small>${nota}`;
-  };
-
-  return envolver(`
-    <h2>Entraron ${formatear(importeCents)}</h2>
-    <p>¿Cómo quieres repartirlo? No se queda suelto: va a algún techo.</p>
-
-    <div class="botones">
-      ${opciones
-        .map(
-          (o) => `<button class="btn ${o.id === MODO.MITADES ? 'principal' : ''}"
-              data-accion="elegir-distribucion" data-modo="${o.id}"
-              style="text-align:left;line-height:1.45">
-              <b>${esc(o.titulo)}</b> · ${esc(o.detalle)}<br>${resumen(o.reparto)}
-            </button>`,
-        )
-        .join('')}
-    </div>
-
-    <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cancelar</button></div>`);
-}
-
-/** Elegir a mano un techo para el ingreso (opcion 3 de §9). */
-function hojaDistribucionManual({ importeCents, periodo }) {
-  return envolver(`
-    <h2>¿Dónde pongo ${formatear(importeCents)}?</h2>
-    <div class="botones">
-      ${ORDEN.map((b) => {
-        const libre = margen(periodo, b);
-        return `<button class="btn" data-accion="elegir-bucket-ingreso" data-bucket="${b}" style="text-align:left">
-            <b>${esc(ETIQUETAS[b])}</b>
-            <small style="color:var(--tinta-3)"> · ${libre < 0 ? `rebasado en ${formatear(-libre)}` : `${formatear(libre)} libres`}</small>
-          </button>`;
-      }).join('')}
-    </div>
-    <div class="botones"><button class="btn" data-accion="cerrar-hoja">Atrás</button></div>`);
-}
-
-/**
  * Sobrante del mes e historial (§11 a §13).
  *
  * La cifra del mes cerrado no cambia nunca. Elegir destino solo anota que se
@@ -4883,8 +4698,6 @@ function etiquetaSobrante(destino) {
   __e.hojaFondos = hojaFondos;
   __e.hojaAlta = hojaAlta;
   __e.hojaDestinos = hojaDestinos;
-  __e.hojaDistribucion = hojaDistribucion;
-  __e.hojaDistribucionManual = hojaDistribucionManual;
   __e.hojaSobrante = hojaSobrante;
 };
 
@@ -5275,9 +5088,6 @@ function ajustesPorDefecto(zona) {
     // Ingreso mensual normal (§14). Se pregunta una vez, en el alta, y se
     // aplica solo cada dia 1. Sustituye al anclaje manual de saldo.
     ingresoNormal: { montoCents: 0, configurado: false, diaAplicacion: 1, pesos: null },
-
-    // A partir de aqui, un ingreso informal pregunta como repartirse (§9).
-    umbralPregunta: 5_000,
 
     destinos: DESTINOS_INICIALES,
 

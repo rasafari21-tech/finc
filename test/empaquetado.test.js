@@ -150,25 +150,32 @@ test('prueba.html reparte un ingreso informal igual que la app', async () => {
     () => ventana.__auditor?.estado?.get?.().periodo && ventana.__auditor,
   );
 
-  // Pequeno: mitad y mitad, en cantidades redondas y sin preguntar.
-  const chico = await auditor.comandos.registrarIngreso({ importeCents: 2_000 });
-  assert.equal(chico.ok, true);
+  // Sin tocar nada: mitad Inversion, mitad Reserva.
+  const defecto = await auditor.comandos.registrarIngreso({ importeCents: 2_000 });
+  assert.equal(defecto.ok, true);
 
   // El bundle corre en otro realm de V8, asi que sus objetos no comparten
   // Object.prototype con los de este archivo: deepStrictEqual fallaria por
   // identidad de prototipo aunque los valores coincidan. Se compara el JSON.
-  assert.deepEqual(JSON.parse(JSON.stringify(chico.reparto)), {
+  assert.deepEqual(JSON.parse(JSON.stringify(defecto.reparto)), {
     ESENCIALES: 0,
     INVERSION: 1_000,
     RESERVA: 1_000,
     RECOMPENSAS: 0,
   });
 
-  // Grande: pregunta antes de escribir nada.
-  const grande = await auditor.comandos.registrarIngreso({ importeCents: 7_000 });
-  assert.equal(grande.ok, false);
-  assert.equal(grande.requierePreguntar, true);
-  assert.equal(grande.opciones.length, 3);
+  // Marcando otros techos, el reparto cambia al instante.
+  const elegido = await auditor.comandos.registrarIngreso({
+    importeCents: 4_000,
+    buckets: ['ESENCIALES', 'RECOMPENSAS'],
+  });
+  assert.equal(elegido.ok, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(elegido.reparto)), {
+    ESENCIALES: 2_000,
+    INVERSION: 0,
+    RESERVA: 0,
+    RECOMPENSAS: 2_000,
+  });
 });
 
 test('prueba.html aplica las reglas inflexibles', async () => {

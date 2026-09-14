@@ -10,7 +10,6 @@ import { margen, proyeccion, nombrePeriodo, diasEnPeriodo, diaDeFecha } from '..
 import { RAZONES_RESERVA, POR_ID as CATEGORIAS, deBucket, deIngreso } from '../dominio/categorias.js';
 import { destinosDe } from '../dominio/destinos.js';
 import { DESTINOS_SOBRANTE, ordenarHistorial } from '../dominio/sobrante.js';
-import { MODO } from '../dominio/informales.js';
 import { REGLAS_NUCLEO } from '../dominio/reglas.js';
 import { etiquetaDestino } from '../dominio/carry.js';
 import { porcentaje } from '../dominio/dinero.js';
@@ -361,17 +360,6 @@ export function hojaAjustes({ ajustes, estadisticas, boveda }) {
       )
       .join('')}
 
-    <h3>Ingresos informales</h3>
-    <div class="campo">
-      <label for="umbral">A partir de cuánto te pregunto cómo repartirlo</label>
-      <input id="umbral" type="text" inputmode="decimal" data-campo="umbralPregunta"
-             value="${formatear(ajustes.umbralPregunta ?? 5000).replace(/^\D+/, '')}">
-      <span class="ayuda">Por debajo va mitad Inversión, mitad Reserva, sin preguntar.</span>
-    </div>
-    <div class="botones" style="margin-top:0">
-      <button class="btn" data-accion="guardar-umbral">Guardar umbral</button>
-    </div>
-
     <h3>Avisos</h3>
     ${[
       ['sobrante', 'Lo que te sobra, al acabar el mes'],
@@ -504,61 +492,6 @@ export function hojaDestinos({ bucket, ajustes, captura, importeTexto }) {
       : ''}
 
     <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cancelar</button></div>`);
-}
-
-/**
- * Como repartir un ingreso informal grande (§9).
- * Tres opciones, con las cifras ya calculadas: nadie elige a ciegas.
- */
-export function hojaDistribucion({ importeCents, opciones }) {
-  const resumen = (r) => {
-    if (!r) return '';
-    const partes = ORDEN.filter((b) => r.partes[b] > 0)
-      .map((b) => `${formatear(r.partes[b])} · ${ETIQUETAS[b]}`)
-      .join('  ·  ');
-    // Sin color en linea: dentro del boton destacado hay fondo acento y un
-    // estilo inline ganaria a la hoja de estilo, dejando azul sobre azul.
-    const nota = r.ajuste === 'TAPA_DEFICIT' || r.ajuste === 'TAPA_Y_REPARTE'
-      ? '<br><small class="nota-aviso">Va a tapar lo que ya te habías pasado.</small>'
-      : !r.fragmentado
-        ? '<br><small>Entero, sin partirlo en céntimos.</small>'
-        : '';
-    return `<small>${esc(partes)}</small>${nota}`;
-  };
-
-  return envolver(`
-    <h2>Entraron ${formatear(importeCents)}</h2>
-    <p>¿Cómo quieres repartirlo? No se queda suelto: va a algún techo.</p>
-
-    <div class="botones">
-      ${opciones
-        .map(
-          (o) => `<button class="btn ${o.id === MODO.MITADES ? 'principal' : ''}"
-              data-accion="elegir-distribucion" data-modo="${o.id}"
-              style="text-align:left;line-height:1.45">
-              <b>${esc(o.titulo)}</b> · ${esc(o.detalle)}<br>${resumen(o.reparto)}
-            </button>`,
-        )
-        .join('')}
-    </div>
-
-    <div class="botones"><button class="btn" data-accion="cerrar-hoja">Cancelar</button></div>`);
-}
-
-/** Elegir a mano un techo para el ingreso (opcion 3 de §9). */
-export function hojaDistribucionManual({ importeCents, periodo }) {
-  return envolver(`
-    <h2>¿Dónde pongo ${formatear(importeCents)}?</h2>
-    <div class="botones">
-      ${ORDEN.map((b) => {
-        const libre = margen(periodo, b);
-        return `<button class="btn" data-accion="elegir-bucket-ingreso" data-bucket="${b}" style="text-align:left">
-            <b>${esc(ETIQUETAS[b])}</b>
-            <small style="color:var(--tinta-3)"> · ${libre < 0 ? `rebasado en ${formatear(-libre)}` : `${formatear(libre)} libres`}</small>
-          </button>`;
-      }).join('')}
-    </div>
-    <div class="botones"><button class="btn" data-accion="cerrar-hoja">Atrás</button></div>`);
 }
 
 /**

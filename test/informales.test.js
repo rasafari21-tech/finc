@@ -10,13 +10,17 @@ import assert from 'node:assert/strict';
 
 import { repartirRedondo, objetivosAPesos, UNIDAD } from '../src/dominio/redondeo.js';
 import {
-  MODO, PESOS_MITADES, UMBRAL_PREGUNTA, requierePreguntar,
-  deficits, pesosInteligentes, distribuirInformal, opcionesDeReparto,
+  SELECCION_POR_DEFECTO, pesosDeSeleccion, limpiarSeleccion,
+  deficits, distribuirInformal, previoDeSeleccion,
 } from '../src/dominio/informales.js';
 import { ESENCIALES, INVERSION, RESERVA, RECOMPENSAS, ORDEN, PESOS_POR_DEFECTO, ceros } from '../src/dominio/buckets.js';
 
 const u = (n) => n * 100;
 const suma = (p) => ORDEN.reduce((a, b) => a + p[b], 0);
+
+// Mitad y mitad: ya no es una constante del modulo —la seleccion se calcula—,
+// pero sigue siendo el caso mas util para probar el redondeo en si.
+const MITADES = { ESENCIALES: 0, INVERSION: 5_000, RESERVA: 5_000, RECOMPENSAS: 0 };
 
 function periodo({ techos = ceros(), totales = ceros(), pesos = PESOS_POR_DEFECTO } = {}) {
   return { id: '2026-09', pesos, techos: { ...ceros(), ...techos }, totales: { ...ceros(), ...totales } };
@@ -31,7 +35,7 @@ test('redondeo · los ejemplos de la especificación salen exactos', () => {
     [u(70), u(35), u(35)],
   ];
   for (const [importe, inv, res] of casos) {
-    const { partes, fragmentado } = repartirRedondo(importe, PESOS_MITADES, { prioritario: RESERVA });
+    const { partes, fragmentado } = repartirRedondo(importe, MITADES, { prioritario: RESERVA });
     assert.equal(fragmentado, true);
     assert.equal(partes[INVERSION], inv, `${importe} → Inversión`);
     assert.equal(partes[RESERVA], res, `${importe} → Reserva`);
@@ -40,14 +44,14 @@ test('redondeo · los ejemplos de la especificación salen exactos', () => {
 });
 
 test('redondeo · un importe impar da dos cantidades enteras, no dos con céntimos', () => {
-  const { partes } = repartirRedondo(u(25), PESOS_MITADES, { prioritario: RESERVA });
+  const { partes } = repartirRedondo(u(25), MITADES, { prioritario: RESERVA });
   assert.equal(partes[INVERSION], u(13));
   assert.equal(partes[RESERVA], u(12));
   assert.equal(suma(partes), u(25));
 });
 
 test('redondeo · lo que no es cantidad entera NO se fragmenta', () => {
-  const { partes, fragmentado, motivo } = repartirRedondo(327, PESOS_MITADES, { prioritario: RESERVA });
+  const { partes, fragmentado, motivo } = repartirRedondo(327, MITADES, { prioritario: RESERVA });
   assert.equal(fragmentado, false);
   assert.equal(motivo, 'NO_ES_CANTIDAD_ENTERA');
   assert.equal(partes[RESERVA], 327, 'va entero al prioritario');
@@ -55,7 +59,7 @@ test('redondeo · lo que no es cantidad entera NO se fragmenta', () => {
 });
 
 test('redondeo · lo demasiado pequeño tampoco se fragmenta', () => {
-  const { partes, fragmentado, motivo } = repartirRedondo(u(1), PESOS_MITADES, { prioritario: RESERVA });
+  const { partes, fragmentado, motivo } = repartirRedondo(u(1), MITADES, { prioritario: RESERVA });
   assert.equal(fragmentado, false);
   assert.equal(motivo, 'DEMASIADO_PEQUENO');
   assert.equal(partes[RESERVA], u(1));
@@ -95,18 +99,47 @@ test('objetivosAPesos · normaliza a 10.000 puntos básicos exactos', () => {
   assert.equal(objetivosAPesos(ceros()), null);
 });
 
-// --- umbral ---------------------------------------------------------------
+// --- seleccion ------------------------------------------------------------
 
-test('umbral · R$20 y R$40 no preguntan; R$70 sí', () => {
-  assert.equal(requierePreguntar(u(20)), false);
-  assert.equal(requierePreguntar(u(40)), false);
-  assert.equal(requierePreguntar(u(70)), true);
-  assert.equal(UMBRAL_PREGUNTA, u(50));
+test('por defecto vienen marcados Inversión y Reserva', () => {
+  assert.deepEqual(SELECCION_POR_DEFECTO, [INVERSION, RESERVA]);
+  assert.deepEqual(limpiarSeleccion(undefined), [INVERSION, RESERVA]);
+  assert.deepEqual(limpiarSeleccion([]), [INVERSION, RESERVA], 'sin nada marcado se vuelve al defecto');
 });
 
-// --- distribución por defecto ---------------------------------------------
+test('la selección se ordena y se limpia de repetidos', () => {
+  assert.deepEqual(limpiarSeleccion([RECOMPENSAS, ESENCIALES, ESENCIALES]), [ESENCIALES, RECOMPENSAS]);
+  assert.deepEqual(limpiarSeleccion(['INVENTADO', RESERVA]), [RESERVA]);
+});
 
-test('por defecto · mitad Inversión, mitad Reserva, nada a las otras dos', () => {
+test('los pesos se reparten en partes iguales y suman 10.000 exactos', () => {
+  assert.equal(pesosDeSeleccion([INVERSION, RESERVA])[INVERSION], 5_000);
+  assert.equal(pesosDeSeleccion([ESENCIALES])[ESENCIALES], 10_000);
+
+  for (const sel of [[ESENCIALES], [INVERSION, RESERVA], [ESENCIALES, INVERSION, RESERVA], ORDEN]) {
+    const p = pesosDeSeleccion(sel);
+    assert.equal(suma(p), 10_000, `${sel.length} techos no suman 10.000`);
+    for (const b of ORDEN) {
+      if (!sel.includes(b)) assert.equal(p[b], 0, `${b} no estaba marcado y recibió peso`);
+    }
+  }
+});
+
+test('tres techos: el resto de los puntos básicos va por orden canónico', () => {
+  const p = pesosDeSeleccion([ESENCIALES, INVERSION, RESERVA]);
+  assert.equal(suma(p), 10_000);
+  assert.equal(p[ESENCIALES], 3_334, 'el primero del orden absorbe el punto suelto');
+  assert.equal(p[INVERSION], 3_333);
+  assert.equal(p[RESERVA], 3_333);
+});
+
+test('sin ningún techo marcado es un error del programador, no del usuario', () => {
+  assert.throws(() => pesosDeSeleccion([]), /SIN_SELECCION/);
+});
+
+// --- reparto entre los techos marcados ------------------------------------
+
+test('por defecto · mitad Inversión, mitad Reserva', () => {
   const p = periodo({ techos: { ESENCIALES: u(1000), INVERSION: u(500), RESERVA: u(300), RECOMPENSAS: u(200) } });
   const r = distribuirInformal(u(20), p, {});
 
@@ -116,18 +149,47 @@ test('por defecto · mitad Inversión, mitad Reserva, nada a las otras dos', () 
   assert.equal(r.partes[RECOMPENSAS], 0);
 });
 
-test('MODO.MANUAL · va entero al techo elegido', () => {
-  const p = periodo();
-  const r = distribuirInformal(u(37), p, { modo: MODO.MANUAL, bucketManual: RECOMPENSAS });
+test('un solo techo marcado se lo lleva entero', () => {
+  const r = distribuirInformal(u(37), periodo(), { buckets: [RECOMPENSAS] });
   assert.equal(r.partes[RECOMPENSAS], u(37));
   assert.equal(suma(r.partes), u(37));
 });
 
-test('MODO.MANUAL · exige un techo válido', () => {
-  assert.throws(() => distribuirInformal(u(10), periodo(), { modo: MODO.MANUAL }), /SIN_BUCKET_MANUAL/);
+test('los cuatro marcados dan cuartos, no el reparto 50/25/15/10', () => {
+  const r = distribuirInformal(u(100), periodo(), { buckets: ORDEN });
+  for (const b of ORDEN) assert.equal(r.partes[b], u(25), `${b} deberia llevarse un cuarto`);
 });
 
-// --- lógica inteligente (§10) ---------------------------------------------
+test('tres marcados dan tercios en cantidades enteras', () => {
+  const r = distribuirInformal(u(30), periodo(), { buckets: [ESENCIALES, INVERSION, RESERVA] });
+  assert.equal(r.partes[ESENCIALES], u(10));
+  assert.equal(r.partes[INVERSION], u(10));
+  assert.equal(r.partes[RESERVA], u(10));
+  assert.equal(r.partes[RECOMPENSAS], 0);
+  assert.equal(suma(r.partes), u(30));
+});
+
+test('lo que no se puede partir en redondo va entero a Reserva si está marcada', () => {
+  const r = distribuirInformal(327, periodo(), { buckets: [INVERSION, RESERVA] });
+  assert.equal(r.fragmentado, false);
+  assert.equal(r.partes[RESERVA], 327);
+  assert.equal(r.partes[INVERSION], 0);
+});
+
+test('sin Reserva marcada, lo no fragmentable va al primero del orden', () => {
+  const r = distribuirInformal(327, periodo(), { buckets: [ESENCIALES, RECOMPENSAS] });
+  assert.equal(r.partes[ESENCIALES], 327);
+});
+
+test('la vista previa coincide con lo que se acabará guardando', () => {
+  const p = periodo();
+  for (const sel of [[INVERSION, RESERVA], ORDEN, [ESENCIALES]]) {
+    const previo = previoDeSeleccion(u(60), p, sel);
+    const real = distribuirInformal(u(60), p, { buckets: sel }).partes;
+    assert.deepEqual(previo, real);
+  }
+  assert.equal(previoDeSeleccion(0, p, [RESERVA]), null, 'sin importe no hay nada que enseñar');
+});
 
 test('déficits · mide solo lo que está en rojo', () => {
   const p = periodo({
@@ -139,98 +201,27 @@ test('déficits · mide solo lo que está en rojo', () => {
   assert.equal(d[RECOMPENSAS], 0);
 });
 
-test('inteligente · sin techos en rojo respeta la distribución elegida', () => {
-  const p = periodo({ techos: { ESENCIALES: u(600) }, totales: { ESENCIALES: u(100) } });
-  const r = pesosInteligentes(u(20), p, PESOS_MITADES);
-  assert.equal(r.motivo, 'SIN_DEFICIT');
-  assert.deepEqual(r.pesos, PESOS_MITADES);
-});
-
-test('inteligente · si no llega a tapar el agujero, todo va al agujero', () => {
-  const p = periodo({
-    techos: { ESENCIALES: u(600) },
-    totales: { ESENCIALES: u(650) },
-  });
-  const r = distribuirInformal(u(20), p, {});
-
-  assert.equal(r.ajuste, 'TAPA_DEFICIT');
-  assert.equal(r.partes[ESENCIALES], u(20), 'los R$20 tapan sobrepaso, no se van a Reserva');
-  assert.equal(r.partes[RESERVA], 0);
-});
-
-test('inteligente · tapa el agujero y reparte lo que sobra', () => {
-  const p = periodo({
-    techos: { ESENCIALES: u(600) },
-    totales: { ESENCIALES: u(620) },
-  });
-  // R$100: R$20 tapan Esenciales, R$80 se reparten mitad y mitad
-  const r = distribuirInformal(u(100), p, { modo: MODO.MITADES });
-
-  assert.equal(r.ajuste, 'TAPA_Y_REPARTE');
-  assert.equal(r.partes[ESENCIALES], u(20));
-  assert.equal(r.partes[INVERSION], u(40));
-  assert.equal(r.partes[RESERVA], u(40));
-  assert.equal(suma(r.partes), u(100));
-});
-
-test('inteligente · reparte el agujero entre varios techos en rojo', () => {
-  const p = periodo({
-    techos: { ESENCIALES: u(600), RECOMPENSAS: u(100) },
-    totales: { ESENCIALES: u(630), RECOMPENSAS: u(110) },
-  });
-  const r = distribuirInformal(u(40), p, {});
-
-  assert.equal(r.ajuste, 'TAPA_DEFICIT');
-  assert.equal(r.partes[ESENCIALES] + r.partes[RECOMPENSAS], u(40));
-  assert.ok(r.partes[ESENCIALES] > r.partes[RECOMPENSAS], 'el agujero mayor recibe más');
-  assert.equal(suma(r.partes), u(40));
-});
-
-test('inteligente · se puede desactivar para ver el reparto puro', () => {
-  const p = periodo({ techos: { ESENCIALES: u(600) }, totales: { ESENCIALES: u(650) } });
-  const r = distribuirInformal(u(20), p, { inteligente: false });
+test('la selección manda: un techo en rojo no desvía el dinero', () => {
+  const p = periodo({ techos: { ESENCIALES: u(600) }, totales: { ESENCIALES: u(700) } });
+  const r = distribuirInformal(u(20), p, { buckets: [INVERSION, RESERVA] });
+  assert.equal(r.partes[ESENCIALES], 0, 'si no lo marcaste, no va ahi');
   assert.equal(r.partes[INVERSION], u(10));
   assert.equal(r.partes[RESERVA], u(10));
 });
 
-// --- las tres opciones de §9 ----------------------------------------------
-
-test('opciones · las tres llegan con sus cifras ya calculadas', () => {
-  const p = periodo({ techos: { ESENCIALES: u(1000) }, totales: { ESENCIALES: u(400) } });
-  const ops = opcionesDeReparto(u(70), p, PESOS_POR_DEFECTO);
-
-  assert.equal(ops.length, 3);
-
-  const mitades = ops.find((o) => o.id === MODO.MITADES);
-  assert.equal(mitades.reparto.partes[INVERSION], u(35));
-  assert.equal(mitades.reparto.partes[RESERVA], u(35));
-
-  const cuatro = ops.find((o) => o.id === MODO.CUATRO);
-  assert.equal(suma(cuatro.reparto.partes), u(70));
-  assert.ok(cuatro.reparto.partes[ESENCIALES] > 0, 'el reparto a cuatro sí toca Esenciales');
-
-  const manual = ops.find((o) => o.id === MODO.MANUAL);
-  assert.equal(manual.reparto, null, 'el manual no calcula nada hasta que se elige techo');
-});
-
-test('opciones · el reparto a cuatro nunca deja céntimos', () => {
-  const p = periodo();
-  for (const reales of [70, 100, 137, 250, 999]) {
-    const ops = opcionesDeReparto(u(reales), p, PESOS_POR_DEFECTO);
-    const cuatro = ops.find((o) => o.id === MODO.CUATRO).reparto;
-    assert.equal(suma(cuatro.partes), u(reales));
-    if (!cuatro.fragmentado) continue;
-    for (const b of ORDEN) assert.equal(cuatro.partes[b] % UNIDAD, 0);
-  }
-});
-
-test('ningún ingreso se queda sin asignar, sea cual sea el importe', () => {
+test('ningún ingreso se queda sin asignar, marque lo que marque', () => {
   const p = periodo({ techos: { ESENCIALES: u(600) }, totales: { ESENCIALES: u(700) } });
-  for (let i = 0; i < 3000; i++) {
+  const combinaciones = [
+    [INVERSION, RESERVA], ORDEN, [ESENCIALES], [RECOMPENSAS],
+    [ESENCIALES, RESERVA], [ESENCIALES, INVERSION, RECOMPENSAS],
+  ];
+  for (let i = 0; i < 2000; i++) {
     const importe = 1 + Math.floor(Math.random() * 500_000);
-    for (const modo of [MODO.MITADES, MODO.CUATRO]) {
-      const r = distribuirInformal(importe, p, { modo, pesosBase: PESOS_POR_DEFECTO });
-      assert.equal(suma(r.partes), importe, `${modo} con ${importe}`);
+    const sel = combinaciones[i % combinaciones.length];
+    const r = distribuirInformal(importe, p, { buckets: sel });
+    assert.equal(suma(r.partes), importe, `${sel.join('+')} con ${importe}`);
+    for (const b of ORDEN) {
+      if (!sel.includes(b)) assert.equal(r.partes[b], 0, `${b} recibio sin estar marcado`);
     }
   }
 });

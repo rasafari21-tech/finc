@@ -195,9 +195,6 @@ export function ajustesPorDefecto(zona) {
     // aplica solo cada dia 1. Sustituye al anclaje manual de saldo.
     ingresoNormal: { montoCents: 0, configurado: false, diaAplicacion: 1, pesos: null },
 
-    // A partir de aqui, un ingreso informal pregunta como repartirse (§9).
-    umbralPregunta: 5_000,
-
     destinos: DESTINOS_INICIALES,
 
     notificaciones: {

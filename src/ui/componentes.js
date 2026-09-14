@@ -78,14 +78,24 @@ export function fichasBucket(periodo, seleccionado) {
   }).join('')}</div>`;
 }
 
-/** Vista previa del reparto 50/25/15/10 mientras se teclea un ingreso. */
-export function previoReparto(reparto) {
-  return `<div class="previo-reparto">${ORDEN.map(
-    (b) => `<div>
-        <span class="p">${ETIQUETAS[b]}</span>
-        <span class="v">${reparto ? formatear(reparto[b]) : '—'}</span>
-      </div>`,
-  ).join('')}</div>`;
+/**
+ * Fichas de ingreso: multiseleccion con el reparto en vivo.
+ *
+ * Misma fila que las fichas de gasto, pero aqui se pueden marcar varias y cada
+ * una enseña cuanto le tocaria ahora mismo. Asi la subdivision se ve antes de
+ * guardar, no despues.
+ */
+export function fichasIngreso(seleccionadas, reparto) {
+  return `<div class="fichas">${ORDEN.map((b) => {
+    const marcado = seleccionadas.includes(b);
+    const toca = reparto?.[b] ?? 0;
+    return `
+      <button class="ficha" data-accion="alternar-ingreso" data-bucket="${b}"
+              aria-pressed="${marcado}">
+        ${ETIQUETAS[b]}
+        <span class="restante">${marcado ? (toca > 0 ? formatear(toca) : '—') : '·'}</span>
+      </button>`;
+  }).join('')}</div>`;
 }
 
 /** Visor del importe, con el texto de ayuda contextual debajo. */

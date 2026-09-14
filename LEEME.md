@@ -150,19 +150,25 @@ que teclear nada cada mes.
 **Ingresos informales.** Los R$20 que aparecen a mitad de mes. No se quedan
 sueltos: entran al reparto igual que todo lo demás.
 
-| Importe | Qué hace |
-|---|---|
-| Menos de R$50 | Mitad Inversión, mitad Reserva. Sin preguntar. |
-| R$50 o más | Pregunta: mitades, entre las cuatro, o lo eliges tú. |
+Al pasar a modo Ingreso, las cuatro fichas se vuelven casillas. **Inversión y
+Reserva vienen marcadas**, que es lo de casi siempre, pero se puede marcar
+cualquier combinación. Cada ficha marcada enseña cuánto le tocaría con lo que
+llevas tecleado, y se recalcula al instante al marcar o desmarcar.
 
-El umbral se cambia en Ajustes. Dos reglas gobiernan el reparto:
+El reparto es **en partes iguales** entre las marcadas: dos marcadas, mitad y
+mitad; tres, un tercio cada una; una sola, entera. El reparto 50/25/15/10 ya
+tiene su sitio, que es el ingreso mensual normal.
+
+No se puede dejar ninguna marcada: desmarcar la última no hace nada. Y la
+selección se conserva para el siguiente ingreso, que suele ir al mismo sitio.
+
+Dos reglas gobiernan las cifras:
 
 - **Cantidades redondas.** Si el importe no es un número entero de reales, no se
   fragmenta: va entero a un solo techo. R$70 → R$35 + R$35; R$3,27 → R$3,27 a
   Reserva, no R$1,63 + R$1,64.
-- **Primero los agujeros.** Si un techo está en rojo, el dinero nuevo lo tapa
-  antes de repartirse. Entran R$20 con Esenciales pasado de R$30 → los R$20 van
-  a Esenciales, no a Reserva.
+- **Manda lo que marques.** Si un techo está en rojo, la app no desvía el dinero
+  por su cuenta: lo ves en la ficha, con el margen en negativo, y decides tú.
 
 **Destinos.** Al elegir techo, la app pregunta a dónde va, sin pedir
 justificaciones:

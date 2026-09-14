@@ -14,7 +14,6 @@ import { crearBovedaInerte } from '../src/datos/boveda.js';
 import { crearRepo } from '../src/datos/repo.js';
 import { crearComandos } from '../src/app/comandos.js';
 import { relojFalso } from '../src/app/reloj.js';
-import { MODO } from '../src/dominio/informales.js';
 import { ESENCIALES, INVERSION, RESERVA, RECOMPENSAS, FONDO_AHORRO, CARTERA_INVERSION } from '../src/dominio/buckets.js';
 
 const u = (n) => n * 100;
@@ -179,49 +178,49 @@ test('informal · R$20 se reparten mitad y mitad sin preguntar', async () => {
   assert.equal(p.ingresoTotal, u(1_500) + u(20));
 });
 
-test('informal · R$70 pregunta antes de tocar nada', async () => {
+test('informal · R$70 sin tocar nada va mitad y mitad, sin preguntar', async () => {
   const { comandos, repo } = await montar('2026-09-10T09:00:00Z', { ingresoNormal: u(1_500) });
-  const antes = await comandos.periodoActual();
 
   const r = await comandos.registrarIngreso({ importeCents: u(70) });
-  assert.equal(r.ok, false);
-  assert.equal(r.requierePreguntar, true);
-  assert.equal(r.opciones.length, 3);
+  assert.equal(r.ok, true, 'ya no hay umbral ni hoja de preguntas');
+  assert.equal(r.reparto[INVERSION], u(35));
+  assert.equal(r.reparto[RESERVA], u(35));
 
-  const despues = await comandos.periodoActual();
-  assert.deepEqual(despues.techos, antes.techos, 'no se escribió nada mientras pregunta');
-
-  const mitades = r.opciones.find((o) => o.id === MODO.MITADES);
-  assert.equal(mitades.reparto.partes[RESERVA], u(35));
-  assert.equal(mitades.reparto.partes[INVERSION], u(35));
-
-  // El usuario elige
-  const elegido = await comandos.registrarIngreso({ importeCents: u(70), modo: MODO.MITADES });
-  assert.equal(elegido.ok, true);
-  assert.equal(elegido.reparto[RESERVA], u(35));
-
-  const movs = await repo.movimientos({ periodId: despues.id });
-  assert.equal(movs.filter((m) => m.claseIngreso === 'informal').length, 1, 'un solo movimiento, no dos');
+  const movs = await repo.movimientos({ periodId: (await comandos.periodoActual()).id });
+  assert.equal(movs.filter((m) => m.claseIngreso === 'informal').length, 1);
 });
 
-test('informal · repartir entre las cuatro usa el reparto habitual', async () => {
-  const { comandos } = await montar('2026-09-10T09:00:00Z', { ingresoNormal: u(1_500) });
-
-  const r = await comandos.registrarIngreso({ importeCents: u(200), modo: MODO.CUATRO });
-  assert.equal(r.ok, true);
-  assert.deepEqual(r.reparto, {
-    ESENCIALES: u(100), INVERSION: u(50), RESERVA: u(30), RECOMPENSAS: u(20),
-  });
-});
-
-test('informal · elegir a mano lo manda entero a un solo techo', async () => {
+test('informal · marcando los cuatro techos toca a cuartos', async () => {
   const { comandos } = await montar('2026-09-10T09:00:00Z', { ingresoNormal: u(1_500) });
 
   const r = await comandos.registrarIngreso({
-    importeCents: u(70), modo: MODO.MANUAL, bucketManual: RECOMPENSAS,
+    importeCents: u(200),
+    buckets: [ESENCIALES, INVERSION, RESERVA, RECOMPENSAS],
   });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.reparto, {
+    ESENCIALES: u(50), INVERSION: u(50), RESERVA: u(50), RECOMPENSAS: u(50),
+  });
+});
+
+test('informal · marcando uno solo se lo lleva entero', async () => {
+  const { comandos } = await montar('2026-09-10T09:00:00Z', { ingresoNormal: u(1_500) });
+
+  const r = await comandos.registrarIngreso({ importeCents: u(70), buckets: [RECOMPENSAS] });
   assert.equal(r.reparto[RECOMPENSAS], u(70));
   assert.equal(r.reparto[RESERVA], 0);
+});
+
+test('informal · marcando tres, tercios y el techo no marcado no recibe nada', async () => {
+  const { comandos } = await montar('2026-09-10T09:00:00Z', { ingresoNormal: u(1_500) });
+
+  const r = await comandos.registrarIngreso({
+    importeCents: u(90), buckets: [ESENCIALES, RESERVA, RECOMPENSAS],
+  });
+  assert.equal(r.reparto[ESENCIALES], u(30));
+  assert.equal(r.reparto[RESERVA], u(30));
+  assert.equal(r.reparto[RECOMPENSAS], u(30));
+  assert.equal(r.reparto[INVERSION], 0, 'no estaba marcado');
 });
 
 test('informal · el ejemplo del punto 6: R$20 cuando ya se gastó de todo', async () => {
@@ -244,15 +243,19 @@ test('informal · el ejemplo del punto 6: R$20 cuando ya se gastó de todo', asy
   );
 });
 
-test('informal · si un techo está en rojo, el dinero nuevo lo tapa primero', async () => {
+test('informal · manda lo que marques, aunque otro techo esté en rojo', async () => {
   const { comandos, reloj } = await montar('2026-09-01T09:00:00Z', { ingresoNormal: u(1_000) });
 
   // Esenciales tiene techo 500; se gastan 530
   await gastarEnTramos(comandos, reloj, { bucket: ESENCIALES, categoryId: 'mercado', total: u(530), tramos: 6 });
 
-  const r = await comandos.registrarIngreso({ importeCents: u(20) });
-  assert.equal(r.detalleReparto.ajuste, 'TAPA_DEFICIT');
-  assert.equal(r.reparto[ESENCIALES], u(20), 'va a tapar, no a Reserva');
+  const porDefecto = await comandos.registrarIngreso({ importeCents: u(20) });
+  assert.equal(porDefecto.reparto[ESENCIALES], 0, 'si no lo marcas, no va ahí');
+  assert.equal(porDefecto.reparto[INVERSION], u(10));
+
+  // Y si decides taparlo, lo marcas y ya
+  const dirigido = await comandos.registrarIngreso({ importeCents: u(30), buckets: [ESENCIALES] });
+  assert.equal(dirigido.reparto[ESENCIALES], u(30));
 });
 
 test('informal · nunca produce céntimos sueltos', async () => {

@@ -20,16 +20,15 @@ import { parsearCentavos, formatear } from '../dominio/dinero.js';
 import { ORDEN, ETIQUETAS, FONDO_AHORRO, CARTERA_INVERSION } from '../dominio/buckets.js';
 import { POR_ID as CATEGORIAS } from '../dominio/categorias.js';
 import { destinosDe, destinoAutomatico } from '../dominio/destinos.js';
-import { MODO, requierePreguntar, distribuirInformal } from '../dominio/informales.js';
+import { previoDeSeleccion, limpiarSeleccion } from '../dominio/informales.js';
 
 import {
-  cabecera, panelTechos, teclado, fichasBucket,
-  previoReparto, visor, avisoDiagnostico, avisoSobrante, esc,
+  cabecera, panelTechos, teclado, fichasBucket, fichasIngreso,
+  visor, avisoDiagnostico, avisoSobrante, esc,
 } from '../ui/componentes.js';
 import {
   hojaRechazo, hojaDetalleTecho, hojaInforme, hojaDiagnostico, hojaCategorias,
-  hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaDistribucion,
-  hojaDistribucionManual, hojaSobrante,
+  hojaAjustes, hojaFondos, hojaAlta, hojaDestinos, hojaSobrante,
 } from '../ui/hojas.js';
 
 const raiz = document.getElementById('app');
@@ -107,10 +106,9 @@ function pistaDeCaptura(s) {
   if (!c.digitos) return c.modo === 'ingreso' ? 'Teclea lo que entró' : 'Teclea el importe';
 
   if (c.modo === 'ingreso') {
-    const centavos = parsearCentavos(c.digitos);
-    const umbral = s.ajustes?.umbralPregunta ?? 5000;
-    if (centavos > 0 && requierePreguntar(centavos, umbral)) return 'Te preguntaré cómo repartirlo';
-    return 'Mitad Inversión, mitad Reserva';
+    const n = limpiarSeleccion(c.bucketsIngreso).length;
+    if (n === 1) return 'Va entero al techo marcado';
+    return `Se divide entre los ${n} techos marcados`;
   }
 
   if (!c.bucket) return 'Elige un techo';
@@ -123,16 +121,10 @@ function pistaDeCaptura(s) {
   return cat ? `${ETIQUETAS[c.bucket]} · ${cat.nombre}` : ETIQUETAS[c.bucket];
 }
 
-/** Vista previa del reparto de un ingreso informal, con las reglas nuevas. */
+/** Cuanto tocaria a cada techo marcado con lo que hay tecleado ahora mismo. */
 function previoIngreso(s, centavos) {
-  if (!(centavos > 0) || !s.periodo) return null;
-  const umbral = s.ajustes?.umbralPregunta ?? 5000;
-  if (requierePreguntar(centavos, umbral)) return null;
-  try {
-    return distribuirInformal(centavos, s.periodo, { modo: MODO.MITADES, pesosBase: s.periodo.pesos }).partes;
-  } catch {
-    return null;
-  }
+  if (!s.periodo) return null;
+  return previoDeSeleccion(centavos, s.periodo, limpiarSeleccion(s.captura.bucketsIngreso));
 }
 
 function render(s) {
@@ -166,7 +158,7 @@ function render(s) {
       ${visor(formatearEntrada(s.captura.digitos), pistaDeCaptura(s), s.captura.modo)}
 
       ${esIngreso
-        ? previoReparto(previoIngreso(s, centavos))
+        ? fichasIngreso(limpiarSeleccion(s.captura.bucketsIngreso), previoIngreso(s, centavos))
         : fichasBucket(s.periodo, s.captura.bucket)}
 
       ${teclado()}
@@ -199,10 +191,6 @@ function renderHoja(s) {
         captura: s.captura,
         importeTexto: s.captura.digitos ? `${s.ajustes?.moneda ?? 'R$'}${formatearEntrada(s.captura.digitos)}` : '',
       });
-    case 'distribucion':
-      return hojaDistribucion({ importeCents: h.importeCents, opciones: h.opciones });
-    case 'distribucion-manual':
-      return hojaDistribucionManual({ importeCents: h.importeCents, periodo: s.periodo });
     case 'sobrante':
       return hojaSobrante({
         pendiente: s.sobrantePendiente,
@@ -267,7 +255,24 @@ const acciones = {
   },
 
   modo(el, s) {
-    estado.set({ captura: { ...capturaVacia(), modo: el.dataset.modo, digitos: s.captura.digitos } });
+    estado.set({
+      captura: {
+        ...capturaVacia(),
+        modo: el.dataset.modo,
+        digitos: s.captura.digitos,
+        bucketsIngreso: s.captura.bucketsIngreso,
+      },
+    });
+  },
+
+  /** Marca o desmarca un techo para el ingreso. Nunca se queda sin ninguno. */
+  'alternar-ingreso'(el, s) {
+    const b = el.dataset.bucket;
+    const actual = limpiarSeleccion(s.captura.bucketsIngreso);
+    const siguiente = actual.includes(b) ? actual.filter((x) => x !== b) : [...actual, b];
+    if (!siguiente.length) return; // desmarcar el ultimo no hace nada
+    estado.set({ captura: { ...s.captura, bucketsIngreso: siguiente } });
+    vibrar(8);
   },
 
   /**
@@ -383,24 +388,6 @@ const acciones = {
 
   // --- distribucion de ingresos ----------------------------------------
 
-  async 'elegir-distribucion'(el, s) {
-    const modo = el.dataset.modo;
-    const importeCents = s.hoja.importeCents;
-
-    if (modo === MODO.MANUAL) {
-      abrirHoja({ tipo: 'distribucion-manual', importeCents });
-      return;
-    }
-    cerrarHoja();
-    await guardarIngreso(importeCents, { modo });
-  },
-
-  async 'elegir-bucket-ingreso'(el, s) {
-    const importeCents = s.hoja.importeCents;
-    cerrarHoja();
-    await guardarIngreso(importeCents, { modo: MODO.MANUAL, bucketManual: el.dataset.bucket });
-  },
-
   // --- alta -------------------------------------------------------------
 
   async 'guardar-alta'() {
@@ -506,15 +493,6 @@ const acciones = {
     brindar(`Ingreso mensual: ${formatear(centavos)}.`);
   },
 
-  async 'guardar-umbral'() {
-    const centavos = parsearCentavos(capaHojas.querySelector('[data-campo="umbralPregunta"]')?.value ?? '');
-    if (!(centavos > 0)) return;
-    const ajustes = await repo.ajustes();
-    await repo.guardarAjustes({ ...ajustes, umbralPregunta: centavos });
-    await refrescar();
-    abrirHoja({ tipo: 'ajustes', estadisticas: await repo.estadisticas() });
-  },
-
   async 'añadir-destino'(el) {
     const nombre = prompt('Nombre del destino');
     if (!nombre?.trim()) return;
@@ -598,8 +576,7 @@ function vibrar(ms) {
 /** Camino unico de guardado de gastos. */
 async function guardar(captura) {
   if (captura.modo === 'ingreso') {
-    const centavos = parsearCentavos(captura.digitos);
-    return guardarIngreso(centavos, {});
+    return guardarIngreso(parsearCentavos(captura.digitos), captura.bucketsIngreso);
   }
 
   const centavos = parsearCentavos(captura.digitos);
@@ -654,22 +631,21 @@ async function guardar(captura) {
 }
 
 /** Camino unico de registro de ingresos informales. */
-async function guardarIngreso(centavos, { modo, bucketManual }) {
+async function guardarIngreso(centavos, buckets) {
   if (!(centavos > 0)) return;
 
-  const r = await comandos.registrarIngreso({ importeCents: centavos, modo, bucketManual });
+  const r = await comandos.registrarIngreso({ importeCents: centavos, buckets });
 
-  if (r.requierePreguntar) {
-    abrirHoja({ tipo: 'distribucion', importeCents: r.importeCents, opciones: r.opciones });
-    return;
-  }
   if (!r.ok) {
     brindar(r.veredicto?.mensaje ?? 'No se pudo registrar.');
     return;
   }
 
   vibrar(14);
-  estado.set({ captura: capturaVacia(), hoja: null });
+  estado.set({
+    captura: { ...capturaVacia(), modo: 'ingreso', bucketsIngreso: limpiarSeleccion(buckets) },
+    hoja: null,
+  });
   await refrescar();
 
   const destinos = ORDEN.filter((b) => r.reparto[b] > 0)

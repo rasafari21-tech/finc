@@ -59,6 +59,8 @@ export function capturaVacia() {
     modo: 'gasto', // gasto | ingreso
     digitos: '',
     bucket: null,
+    // Techos marcados en modo ingreso. Inversion y Reserva de salida.
+    bucketsIngreso: ['INVERSION', 'RESERVA'],
     categoryId: null,
     nota: '',
     tags: [],
